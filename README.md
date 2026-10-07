@@ -23,7 +23,7 @@ Optional checks that fail are shown in orange and don't count against the entry.
 
 **Branch** defaults to the repository's default branch. **GitHub CLI Path** is found automatically in `/opt/homebrew/bin`, `/usr/local/bin` or `/usr/bin`; set it if `gh` lives somewhere else.
 
-The extension reads through `gh`, so it sees exactly what your `gh` account can see. Each refresh is one GraphQL query. Required checks come from the branch's rulesets and are cached for an hour. Job logs are only fetched when you open a failed job, or press `⌘L` on another one.
+The extension reads through `gh`, so it sees exactly what your `gh` account can see. Each refresh is one GraphQL query. Required checks come from the branch's rulesets and branch protection (read access is enough) and are cached for an hour. Job logs are only fetched when you open a failed job, or press `⌘L` on another one.
 
 ## Shortcuts
 

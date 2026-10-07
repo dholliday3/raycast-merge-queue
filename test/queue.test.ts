@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { DEMO_REPO, DEMO_REQUIRED_CHECKS, demoQueue } from "../src/lib/demo";
 import { GhError, parseRepository, setupCommand } from "../src/lib/gh";
-import { failingRunIds, parseQueue, primaryFailingJob, QueueResponse, queueBranch } from "../src/lib/queue";
+import {
+  failingRunIds,
+  parseQueue,
+  primaryFailingJob,
+  QueueResponse,
+  queueBranch,
+  requiredContexts,
+} from "../src/lib/queue";
 
 const now = new Date("2026-10-07T14:30:00Z");
 const snapshot = () => parseQueue(DEMO_REPO, demoQueue(now), DEMO_REQUIRED_CHECKS, now);
@@ -94,4 +101,32 @@ describe("setupCommand", () => {
   it("suggests signing in when gh isn't", () =>
     expect(setupCommand(new GhError("nope", "unauthenticated"))).toBe("gh auth login"));
   it("has nothing for other errors", () => expect(setupCommand(new Error("boom"))).toBeUndefined());
+});
+
+describe("requiredContexts", () => {
+  const ruleset = (...contexts: string[]) => ({
+    type: "required_status_checks",
+    parameters: { required_status_checks: contexts.map((context) => ({ context })) },
+  });
+
+  it("reads rulesets", () =>
+    expect(requiredContexts([{ type: "creation" }, ruleset("build", "lint")], undefined)).toEqual(["build", "lint"]));
+
+  it("reads classic branch protection", () =>
+    expect(
+      requiredContexts([], {
+        protection: {
+          required_status_checks: { contexts: ["Merge Queue Guard"], checks: [{ context: "Google testing" }] },
+        },
+      }),
+    ).toEqual(["Merge Queue Guard", "Google testing"]));
+
+  it("combines both without duplicates", () =>
+    expect(
+      requiredContexts([ruleset("build", "e2e")], {
+        protection: { required_status_checks: { contexts: ["e2e", "deploy"] } },
+      }),
+    ).toEqual(["build", "e2e", "deploy"]));
+
+  it("is empty for an unprotected branch", () => expect(requiredContexts([], {})).toEqual([]));
 });

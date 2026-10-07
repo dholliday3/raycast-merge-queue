@@ -100,9 +100,13 @@ export type QueueResponse = {
   } | null;
 };
 
-type RawRule = {
+export type RawRule = {
   type: string;
   parameters?: { required_status_checks?: { context: string }[] };
+};
+
+export type RawBranch = {
+  protection?: { required_status_checks?: { contexts?: string[]; checks?: { context: string }[] } };
 };
 
 const QUEUE_QUERY = `
@@ -282,17 +286,30 @@ function toEntry(raw: RawEntry, viewer: string, required: Set<string>): QueueEnt
   };
 }
 
-export async function fetchRequiredChecks(config: RepoConfig, branch: string): Promise<string[]> {
-  const rules = await rest<RawRule[]>(
-    config,
-    `repos/${repoSlug(config)}/rules/branches/${encodeURIComponent(branch)}?per_page=100`,
-  );
-  const contexts = rules.flatMap((rule) =>
+export function requiredContexts(rules: RawRule[], branch: RawBranch | undefined): string[] {
+  const fromRulesets = rules.flatMap((rule) =>
     rule.type === "required_status_checks"
       ? (rule.parameters?.required_status_checks ?? []).map((check) => check.context)
       : [],
   );
-  return [...new Set(contexts)];
+  const protection = branch?.protection?.required_status_checks;
+  const fromProtection = [...(protection?.contexts ?? []), ...(protection?.checks ?? []).map((check) => check.context)];
+  return [...new Set([...fromRulesets, ...fromProtection])];
+}
+
+export async function fetchRequiredChecks(config: RepoConfig, branch: string): Promise<string[]> {
+  const encoded = encodeURIComponent(branch);
+  const [rules, protection] = await Promise.allSettled([
+    rest<RawRule[]>(config, `repos/${repoSlug(config)}/rules/branches/${encoded}?per_page=100`),
+    rest<RawBranch>(config, `repos/${repoSlug(config)}/branches/${encoded}`),
+  ]);
+  if (rules.status === "rejected" && protection.status === "rejected") {
+    throw rules.reason;
+  }
+  return requiredContexts(
+    rules.status === "fulfilled" ? rules.value : [],
+    protection.status === "fulfilled" ? protection.value : undefined,
+  );
 }
 
 export function queueBranch(config: Pick<RepoConfig, "branch">, data: QueueResponse): string {
