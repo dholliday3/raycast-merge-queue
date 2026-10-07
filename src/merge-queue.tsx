@@ -1,13 +1,15 @@
 import { Action, ActionPanel, Icon, Keyboard, LaunchProps, List, openExtensionPreferences } from "@raycast/api";
-import { useEffect, useState } from "react";
+import { ReactElement, useEffect, useState } from "react";
 import { ChecksList } from "./components/ChecksList";
 import { JobDetail } from "./components/JobDetail";
 import { entryAccessories, entryIcon, entryStatusText } from "./components/presentation";
+import { RepoPicker, SwitchRepository } from "./components/RepoPicker";
 import { confirmRerunFailedForEntry } from "./components/rerun";
-import { enableDemo, MergeQueueLaunchContext, useMergeQueue } from "./data";
+import { enableDemo, MergeQueueLaunchContext, useMergeQueue, useSelection } from "./data";
 import { ordinal } from "./lib/format";
 import { setupCommand } from "./lib/gh";
 import { failingRunIds, primaryFailingJob, QueueEntry, QueueSnapshot } from "./lib/queue";
+import { RepoSelection } from "./lib/repos";
 
 type Filter = "all" | "mine" | "attention";
 
@@ -50,8 +52,19 @@ function emptyTitle(filter: Filter): string {
   }
 }
 
-function EntryItem(props: { entry: QueueEntry; snapshot: QueueSnapshot; revalidate: () => void }) {
-  const { entry, snapshot, revalidate } = props;
+function isSnapshotOf(snapshot: QueueSnapshot | undefined, selection: RepoSelection | undefined) {
+  return Boolean(
+    snapshot && selection && snapshot.repo.toLowerCase() === `${selection.owner}/${selection.name}`.toLowerCase(),
+  );
+}
+
+function EntryItem(props: {
+  entry: QueueEntry;
+  snapshot: QueueSnapshot;
+  revalidate: () => void;
+  switchAction: ReactElement;
+}) {
+  const { entry, snapshot, revalidate, switchAction } = props;
   const failingJob = primaryFailingJob(entry);
   const canRerun = failingRunIds(entry).length > 0;
 
@@ -109,6 +122,7 @@ function EntryItem(props: { entry: QueueEntry; snapshot: QueueSnapshot; revalida
               url={snapshot.url}
               shortcut={{ modifiers: ["cmd", "shift"], key: "g" }}
             />
+            {switchAction}
           </ActionPanel.Section>
         </ActionPanel>
       }
@@ -118,7 +132,10 @@ function EntryItem(props: { entry: QueueEntry; snapshot: QueueSnapshot; revalida
 
 export default function Command(props: LaunchProps<{ launchContext: MergeQueueLaunchContext }>) {
   enableDemo(props.launchContext?.demo);
-  const { data, error, isLoading, revalidate } = useMergeQueue();
+  const { selection, setSelection, isLoading: selectionLoading } = useSelection();
+  const queue = useMergeQueue(selection);
+  const { error, isLoading, revalidate } = queue;
+  const data = isSnapshotOf(queue.data, selection) ? queue.data : undefined;
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<string>();
   const context = props.launchContext;
@@ -138,6 +155,21 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
     }
   }, [data, selectedId, context?.prNumber]);
 
+  useEffect(() => setSelectedId(undefined), [selection?.owner, selection?.name, selection?.branch]);
+
+  if (!selection) {
+    return selectionLoading ? <List isLoading /> : <RepoPicker onPick={setSelection} />;
+  }
+
+  const switchAction = (
+    <Action.Push
+      title="Switch Repository"
+      icon={Icon.Switch}
+      shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
+      target={<SwitchRepository current={selection} onPick={setSelection} />}
+    />
+  );
+
   const launchedEntry =
     context?.view === "checks" ? data?.entries.find((entry) => entry.pr.number === context.prNumber) : undefined;
   if (launchedEntry) {
@@ -149,7 +181,7 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
 
   return (
     <List
-      isLoading={isLoading}
+      isLoading={isLoading || (!data && !error)}
       searchBarPlaceholder="Filter by title, number, author, or branch"
       selectedItemId={selectedId}
       onSelectionChange={(id) => {
@@ -178,6 +210,7 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
                 <Action.CopyToClipboard title="Copy Setup Command" content={command} icon={Icon.Terminal} />
               ) : null}
               <Action title="Retry" icon={Icon.ArrowClockwise} onAction={revalidate} />
+              {switchAction}
               <Action title="Open Extension Preferences" icon={Icon.Gear} onAction={openExtensionPreferences} />
             </ActionPanel>
           }
@@ -191,6 +224,7 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
             <ActionPanel>
               <Action.OpenInBrowser title="Open Merge Queue on GitHub" url={data.url} />
               <Action title="Refresh" icon={Icon.ArrowClockwise} onAction={revalidate} />
+              {switchAction}
             </ActionPanel>
           }
         />
@@ -198,7 +232,13 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
       {data ? (
         <List.Section title={`${data.repo} · ${data.branch}`} subtitle={sectionSubtitle(data)}>
           {entries.map((entry) => (
-            <EntryItem key={entry.id} entry={entry} snapshot={data} revalidate={revalidate} />
+            <EntryItem
+              key={entry.id}
+              entry={entry}
+              snapshot={data}
+              revalidate={revalidate}
+              switchAction={switchAction}
+            />
           ))}
         </List.Section>
       ) : null}

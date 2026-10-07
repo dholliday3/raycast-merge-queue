@@ -1,7 +1,22 @@
 import { Annotation, Job } from "./jobs";
 import { QueueResponse, RawCheckRun, RawEntry } from "./queue";
+import { RepoChoice } from "./repos";
 
 export const DEMO_REPO = { owner: "acme", name: "storefront", branch: "main" };
+
+const demoChoice = (slug: string, fields: Partial<RepoChoice>): RepoChoice => {
+  const [owner, name] = slug.split("/");
+  return { owner, name, slug, isPrivate: true, stars: 0, yourQueued: 0, defaultBranch: "main", ...fields };
+};
+
+export const DEMO_CHOICES: RepoChoice[] = [
+  demoChoice("acme/storefront", { queueBranch: "main", queued: 6, yourQueued: 2, pushedAt: "2026-10-07T14:20:00Z" }),
+  demoChoice("acme/payments", { queueBranch: "main", queued: 2, pushedAt: "2026-10-07T13:05:00Z" }),
+  demoChoice("acme/mobile", { queueBranch: "develop", defaultBranch: "main", pushedAt: "2026-10-07T11:40:00Z" }),
+  demoChoice("acme/design-system", { queueBranch: "main", queued: 0, pushedAt: "2026-10-06T22:10:00Z" }),
+  demoChoice("acme/docs", { pushedAt: "2026-10-06T18:00:00Z" }),
+  demoChoice("acme/infra", { pushedAt: "2026-10-05T09:30:00Z" }),
+];
 export const DEMO_REQUIRED_CHECKS = ["build", "lint", "typecheck", "unit tests", "e2e (chromium)", "migrations"];
 export const DEMO_FAILING_JOB_ID = 9100;
 

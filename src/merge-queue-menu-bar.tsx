@@ -11,7 +11,7 @@ import {
   showHUD,
 } from "@raycast/api";
 import { checkIcon, entryIcon, entryStatusText } from "./components/presentation";
-import { MergeQueueLaunchContext, requestRerunFailed, useMergeQueue } from "./data";
+import { MergeQueueLaunchContext, requestRerunFailed, useMergeQueue, useSelection } from "./data";
 import { formatAgo, formatSeconds, truncate } from "./lib/format";
 import { setupCommand } from "./lib/gh";
 import { failingRunIds, Health, QueueEntry, QueueSnapshot } from "./lib/queue";
@@ -122,9 +122,24 @@ function EntrySubmenu(props: { entry: QueueEntry; highlightMine: boolean }) {
 }
 
 export default function Command() {
-  const { data, error, isLoading, revalidate } = useMergeQueue();
+  const { selection, isLoading: selectionLoading } = useSelection();
+  const { data, error, isLoading, revalidate } = useMergeQueue(selection);
   const mine = data?.entries.filter((entry) => entry.isMine) ?? [];
   const command = setupCommand(error);
+
+  if (!selection) {
+    return (
+      <MenuBarExtra icon={Icon.BulletPoints} tooltip="Merge Queue" isLoading={selectionLoading}>
+        {selectionLoading ? null : (
+          <MenuBarExtra.Item
+            title="Choose a Repository…"
+            icon={Icon.MagnifyingGlass}
+            onAction={() => openInRaycast()}
+          />
+        )}
+      </MenuBarExtra>
+    );
+  }
 
   return (
     <MenuBarExtra
@@ -158,7 +173,7 @@ export default function Command() {
         </MenuBarExtra.Section>
       ) : null}
       {data ? (
-        <MenuBarExtra.Section title={`Queue · ${data.entries.length}`}>
+        <MenuBarExtra.Section title={`${data.repo} · ${data.entries.length} queued`}>
           {data.entries.length === 0 ? <MenuBarExtra.Item title="The merge queue is empty" /> : null}
           {data.entries.map((entry) => (
             <EntrySubmenu key={entry.id} entry={entry} highlightMine />

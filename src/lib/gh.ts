@@ -81,7 +81,7 @@ export function gh(config: Pick<RepoConfig, "ghPath">, args: string[]): Promise<
 }
 
 export async function graphql<T>(
-  config: RepoConfig,
+  config: Pick<RepoConfig, "ghPath">,
   query: string,
   variables: Record<string, string | number | undefined>,
 ): Promise<T> {
@@ -101,7 +101,7 @@ export async function graphql<T>(
   return response.data;
 }
 
-export async function rest<T>(config: RepoConfig, path: string): Promise<T> {
+export async function rest<T>(config: Pick<RepoConfig, "ghPath">, path: string): Promise<T> {
   return JSON.parse(await gh(config, ["api", path])) as T;
 }
 

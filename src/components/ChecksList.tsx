@@ -1,6 +1,6 @@
 import { Action, ActionPanel, Color, Icon, List, Keyboard } from "@raycast/api";
 import { useEffect } from "react";
-import { useMergeQueue } from "../data";
+import { useMergeQueue, useSelection } from "../data";
 import { Check, QueueEntry } from "../lib/queue";
 import { checkDurationText, checkIcon, checkLabel, HEALTH_STYLE } from "./presentation";
 import { JobDetail } from "./JobDetail";
@@ -83,7 +83,8 @@ function CheckItem(props: { check: Check; entry: QueueEntry; revalidate: () => v
 }
 
 export function ChecksList(props: { initialEntry: QueueEntry }) {
-  const { data, isLoading, revalidate } = useMergeQueue();
+  const { selection } = useSelection();
+  const { data, isLoading, revalidate } = useMergeQueue(selection);
   const live = data?.entries.find((entry) => entry.pr.number === props.initialEntry.pr.number);
   const entry = live ?? props.initialEntry;
   const leftQueue = Boolean(data) && !live;

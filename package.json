@@ -17,7 +17,7 @@
       "name": "merge-queue",
       "title": "Merge Queue",
       "subtitle": "GitHub",
-      "description": "Browse the merge queue, drill into failing checks, and rerun jobs.",
+      "description": "Pick a repository, browse its merge queue, drill into failing checks, and rerun jobs.",
       "mode": "view",
       "keywords": [
         "github",
@@ -43,23 +43,6 @@
     }
   ],
   "preferences": [
-    {
-      "name": "repository",
-      "title": "Repository",
-      "description": "The repository with the merge queue, as owner/name.",
-      "type": "textfield",
-      "required": true,
-      "placeholder": "owner/name"
-    },
-    {
-      "name": "branch",
-      "title": "Branch",
-      "description": "The branch the merge queue targets. Leave empty to use the repository's default branch.",
-      "type": "textfield",
-      "required": false,
-      "default": "",
-      "placeholder": "main"
-    },
     {
       "name": "ghPath",
       "title": "GitHub CLI Path",

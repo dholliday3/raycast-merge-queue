@@ -4,7 +4,7 @@ See a GitHub merge queue from Raycast: where your pull request sits, what's runn
 
 ## Commands
 
-**Merge Queue** lists every entry in the queue, in order, with its state:
+**Merge Queue** asks for a repository the first time, then lists every entry in the queue, in order, with its state:
 
 - **Merging**: the entry at the front that GitHub is landing now
 - **Running checks**: with how many required checks have finished
@@ -18,10 +18,19 @@ Optional checks that fail are shown in orange and don't count against the entry.
 
 ## Setup
 
-1. Install and sign in to the [GitHub CLI](https://cli.github.com): `brew install gh && gh auth login`
-2. Set **Repository** to the repository with the merge queue, as `owner/name`.
+Install and sign in to the [GitHub CLI](https://cli.github.com): `brew install gh && gh auth login`. That's all; there's nothing to fill in.
 
-**Branch** defaults to the repository's default branch. **GitHub CLI Path** is found automatically in `/opt/homebrew/bin`, `/usr/local/bin` or `/usr/bin`; set it if `gh` lives somewhere else.
+## Choosing a Repository
+
+The first time you open **Merge Queue** it lists repositories to pick from, and `⇧⌘P` brings the list back to switch:
+
+- **Your Queued Pull Requests**: repositories where one of your pull requests is in a merge queue right now
+- **Merge Queue On**: your most recently pushed repositories, and ones you've contributed to, that have a merge queue
+- **Your Other Repositories**: the rest, for a queue the extension couldn't detect
+
+Type to search all of GitHub, sorted by recent pushes, stars, or best match. Type `owner/name` to go straight to a repository, or `owner/name:branch` for a queue on a branch the extension can't detect.
+
+A queue is detected on the default branch, on a branch named in a ruleset with a merge queue rule, or on the base branch of your queued pull requests. **GitHub CLI Path** is found automatically in `/opt/homebrew/bin`, `/usr/local/bin` or `/usr/bin`; set it in preferences if `gh` lives somewhere else.
 
 The extension reads through `gh`, so it sees exactly what your `gh` account can see. Each refresh is one GraphQL query. Required checks come from the branch's rulesets and branch protection (read access is enough) and are cached for an hour. Job logs are only fetched when you open a failed job, or press `⌘L` on another one.
 
@@ -39,6 +48,7 @@ The extension reads through `gh`, so it sees exactly what your `gh` account can 
 | `⇧⌘G` | Open the merge queue on GitHub                                       |
 | `⌘L`  | Load the log of a job that didn't fail                               |
 | `⌘R`  | Refresh                                                              |
+| `⇧⌘P` | Switch repository                                                    |
 
 ## Development
 
