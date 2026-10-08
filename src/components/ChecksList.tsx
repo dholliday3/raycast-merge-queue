@@ -40,7 +40,7 @@ function CheckItem(props: { check: Check; entry: QueueEntry; repo: string; view:
     pr: entry.pr,
     repo,
     sha: entry.headSha,
-    enabled: failing,
+    enabled: failing || check.state === "pending",
     wantLog: failing,
   });
   const { input, failureUrl } = report;

@@ -87,13 +87,18 @@ export function failingStepName(job: Job | undefined, summary: LogSummary | unde
   return failedStep(job)?.name ?? summary?.failingStep;
 }
 
+export function currentStep(job: Job | undefined): JobStep | undefined {
+  return job?.steps.find((step) => step.status === "in_progress");
+}
+
 export function failureUrl(job: Job | undefined, log: LogState, fallback?: string): string | undefined {
   const step = failedStep(job);
   if (!job) {
     return fallback;
   }
   if (!step) {
-    return job.htmlUrl;
+    const running = currentStep(job);
+    return running ? `${job.htmlUrl}#step:${running.number}:1` : job.htmlUrl;
   }
   const line = loadedSummary(log)?.failureLine;
   return `${job.htmlUrl}#step:${step.number}${line ? `:${line}` : ":1"}`;
@@ -148,8 +153,28 @@ function logPlaceholder(log: LogState): string | undefined {
   }
 }
 
+function runningSteps(job: Job): string[] {
+  return job.steps.map((step) => {
+    if (step.status === "in_progress") {
+      const time = duration(step.startedAt, new Date().toISOString());
+      return `- ◐ **${step.name}**${time ? ` · ${time}` : ""}`;
+    }
+    if (step.status !== "completed") {
+      return `- ○ ${step.name}`;
+    }
+    const time = duration(step.startedAt, step.completedAt);
+    return `- ✓ ${step.name}${time ? ` · ${time}` : ""}`;
+  });
+}
+
 export function buildPreviewMarkdown(input: JobReportInput): string {
   const { check, job, log } = input;
+  if (check.state === "pending" && job && job.status !== "completed") {
+    const time = duration(job.startedAt, new Date().toISOString());
+    const step = currentStep(job);
+    const position = step ? ` · step ${step.number} of ${job.steps.length}` : "";
+    return [`Running${time ? ` · ${time}` : ""}${position}`, "", ...runningSteps(job)].join("\n");
+  }
   if (check.state !== "failure") {
     const time =
       check.state === "pending"

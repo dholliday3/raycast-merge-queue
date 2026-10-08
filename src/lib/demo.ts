@@ -19,6 +19,7 @@ export const DEMO_CHOICES: RepoChoice[] = [
 ];
 export const DEMO_REQUIRED_CHECKS = ["build", "lint", "typecheck", "unit tests", "e2e (chromium)", "migrations"];
 export const DEMO_FAILING_JOB_ID = 9100;
+const DEMO_FAILURE_IDS: Record<string, number> = { "e2e (chromium)": 9100, lighthouse: 9101, "bundle size": 9102 };
 
 type RunState = "success" | "failure" | "running" | "queued" | "skipped";
 
@@ -38,9 +39,13 @@ const WORKFLOWS: Record<string, string> = {
 };
 
 let nextId = 9000;
+const runningIds = new Set<number>();
 
 function checkRun(now: Date, name: string, state: RunState, minutes: number, length: number): RawCheckRun {
-  const id = name === "e2e (chromium)" && state === "failure" ? DEMO_FAILING_JOB_ID : nextId++;
+  const id = state === "failure" && DEMO_FAILURE_IDS[name] ? DEMO_FAILURE_IDS[name] : nextId++;
+  if (state === "running") {
+    runningIds.add(id);
+  }
   const started = state === "queued" ? null : minutesAgo(now, minutes);
   const finished = state === "success" || state === "failure" || state === "skipped";
   return {
@@ -98,6 +103,7 @@ function suite(now: Date, states: Partial<Record<string, RunState>>, minutes: nu
 
 export function demoQueue(now = new Date()): QueueResponse {
   nextId = 9000;
+  runningIds.clear();
   return {
     viewer: { login: "you" },
     repository: {
@@ -113,7 +119,7 @@ export function demoQueue(now = new Date()): QueueResponse {
               author: "mira",
               state: "LOCKED",
               enqueuedMinutesAgo: 41,
-              checks: suite(now, {}, 30),
+              checks: suite(now, { lighthouse: "running" }, 30),
             }),
             entry(now, {
               position: 2,
@@ -183,37 +189,111 @@ export function demoQueue(now = new Date()): QueueResponse {
   };
 }
 
-export function demoJob(now = new Date()): Job {
-  const step = (number: number, name: string, conclusion: string, start: number, end: number) => ({
+type DemoStep = [name: string, conclusion: string, startMinutesAgo: number, endMinutesAgo: number];
+
+const DEMO_JOBS: Record<number, { name: string; workflow: string; steps: DemoStep[] }> = {
+  9100: {
+    name: "e2e (chromium)",
+    workflow: "E2E",
+    steps: [
+      ["Set up job", "success", 20, 20],
+      ["Check out code", "success", 20, 19],
+      ["Install dependencies", "success", 19, 17],
+      ["Start the app", "success", 17, 16],
+      ["Run Playwright", "failure", 16, 6],
+      ["Upload report", "success", 6, 6],
+      ["Complete job", "success", 6, 6],
+    ],
+  },
+  9101: {
+    name: "lighthouse",
+    workflow: "Quality",
+    steps: [
+      ["Set up job", "success", 20, 20],
+      ["Check out code", "success", 20, 19],
+      ["Build", "success", 19, 15],
+      ["Run Lighthouse", "failure", 15, 12],
+      ["Complete job", "success", 12, 12],
+    ],
+  },
+  9102: {
+    name: "bundle size",
+    workflow: "Quality",
+    steps: [
+      ["Set up job", "success", 9, 9],
+      ["Check out code", "success", 9, 8],
+      ["Build", "success", 8, 5],
+      ["Check bundle size", "failure", 5, 4],
+      ["Complete job", "success", 4, 4],
+    ],
+  },
+};
+
+const PASSING_STEPS: DemoStep[] = [
+  ["Set up job", "success", 12, 12],
+  ["Check out code", "success", 12, 11],
+  ["Run", "success", 11, 8],
+  ["Complete job", "success", 8, 8],
+];
+
+function runningJob(jobId: number, now: Date): Job {
+  const runId = 7000 + jobId;
+  const step = (number: number, name: string, status: string, start?: number, end?: number) => ({
     number,
     name,
-    status: "completed",
-    conclusion,
-    startedAt: minutesAgo(now, start),
-    completedAt: minutesAgo(now, end),
+    status,
+    conclusion: status === "completed" ? "success" : null,
+    startedAt: start === undefined ? undefined : minutesAgo(now, start),
+    completedAt: end === undefined ? undefined : minutesAgo(now, end),
   });
   return {
-    id: DEMO_FAILING_JOB_ID,
-    runId: 16100,
+    id: jobId,
+    runId,
     runAttempt: 1,
-    name: "e2e (chromium)",
-    status: "completed",
-    conclusion: "failure",
-    htmlUrl: `https://github.com/acme/storefront/actions/runs/16100/job/${DEMO_FAILING_JOB_ID}`,
-    runUrl: "https://github.com/acme/storefront/actions/runs/16100",
-    startedAt: minutesAgo(now, 20),
-    completedAt: minutesAgo(now, 6),
-    workflowName: "E2E",
-    runnerName: "ubuntu-latest-8-core",
+    name: "check",
+    status: "in_progress",
+    conclusion: null,
+    htmlUrl: `https://github.com/acme/storefront/actions/runs/${runId}/job/${jobId}`,
+    runUrl: `https://github.com/acme/storefront/actions/runs/${runId}`,
+    startedAt: minutesAgo(now, 9),
     steps: [
-      step(1, "Set up job", "success", 20, 20),
-      step(2, "Check out code", "success", 20, 19),
-      step(3, "Install dependencies", "success", 19, 17),
-      step(4, "Start the app", "success", 17, 16),
-      step(5, "Run Playwright", "failure", 16, 6),
-      step(6, "Upload report", "success", 6, 6),
-      step(7, "Complete job", "success", 6, 6),
+      step(1, "Set up job", "completed", 9, 9),
+      step(2, "Check out code", "completed", 9, 8),
+      step(3, "Install dependencies", "completed", 8, 6),
+      step(4, "Run tests", "in_progress", 6),
+      step(5, "Upload results", "queued"),
+      step(6, "Complete job", "queued"),
     ],
+  };
+}
+
+export function demoJob(jobId = DEMO_FAILING_JOB_ID, now = new Date()): Job {
+  if (runningIds.has(jobId)) {
+    return runningJob(jobId, now);
+  }
+  const demo = DEMO_JOBS[jobId];
+  const steps = demo?.steps ?? PASSING_STEPS;
+  const runId = 7000 + jobId;
+  return {
+    id: jobId,
+    runId,
+    runAttempt: 1,
+    name: demo?.name ?? "check",
+    status: "completed",
+    conclusion: demo ? "failure" : "success",
+    htmlUrl: `https://github.com/acme/storefront/actions/runs/${runId}/job/${jobId}`,
+    runUrl: `https://github.com/acme/storefront/actions/runs/${runId}`,
+    startedAt: minutesAgo(now, steps[0][2]),
+    completedAt: minutesAgo(now, steps[steps.length - 1][3]),
+    workflowName: demo?.workflow,
+    steps: steps.map(([name, conclusion, start, end], index) => ({
+      number: index + 1,
+      name,
+      status: "completed",
+      conclusion,
+      startedAt: minutesAgo(now, start),
+      completedAt: minutesAgo(now, end),
+    })),
   };
 }
 
@@ -253,3 +333,47 @@ export const DEMO_LOG = [
   "2026-10-07T14:11:41.0000000Z   210 passed (9.4m)",
   "2026-10-07T14:11:42.0000000Z ##[error]Process completed with exit code 1.",
 ].join("\n");
+
+const DEMO_OTHER_LOGS: Record<number, string[]> = {
+  9101: [
+    "##[group]Run npx lhci autorun",
+    "npx lhci autorun",
+    "##[endgroup]",
+    "✅  .lighthouseci/ directory writable",
+    "Running Lighthouse 3 time(s) on http://localhost:4173/checkout",
+    "Checking assertions against 1 URL(s), 3 run(s)",
+    "",
+    "  1 result(s) for http://localhost:4173/checkout :",
+    "",
+    "  ✘  categories.performance failure for minScore assertion",
+    "       expected: >=0.85",
+    "          found: 0.81",
+    "     all values: 0.81, 0.79, 0.82",
+    "",
+    "##[error]Assertion failed: categories.performance 0.81 is below the 0.85 budget",
+    "##[error]Process completed with exit code 1.",
+  ],
+  9102: [
+    "##[group]Run npx size-limit",
+    "npx size-limit",
+    "##[endgroup]",
+    "  dist/main.js",
+    "  Size limit: 300 kB",
+    "  Size:       312.4 kB with all dependencies, minified and gzipped",
+    "",
+    "##[error]dist/main.js is 12.4 kB over its 300 kB limit",
+    "##[error]Process completed with exit code 1.",
+  ],
+};
+
+export function demoAnnotations(jobId: number): Annotation[] {
+  return jobId === DEMO_FAILING_JOB_ID ? DEMO_ANNOTATIONS : [];
+}
+
+export function demoLog(jobId: number): string {
+  if (jobId === DEMO_FAILING_JOB_ID) {
+    return DEMO_LOG;
+  }
+  const lines = DEMO_OTHER_LOGS[jobId] ?? ["##[group]Run checks", "##[endgroup]", "All good."];
+  return lines.map((line) => `2026-10-07T14:10:00.0000000Z ${line}`).join("\n");
+}

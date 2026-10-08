@@ -5,7 +5,7 @@ import { logErrorMessage } from "../lib/errors";
 import { formatSeconds, secondsBetween } from "../lib/format";
 import { jobState } from "../lib/jobs";
 import { Check, PullRequestSummary } from "../lib/queue";
-import { failedStep, failingStepName, failureUrl, JobReportInput, LogState } from "../lib/report";
+import { currentStep, failedStep, failingStepName, failureUrl, JobReportInput, LogState } from "../lib/report";
 import { checkLabel } from "./presentation";
 
 export type MetadataRow =
@@ -38,7 +38,7 @@ export function useJobReport(props: {
   const hasJob = props.check.jobId !== undefined;
   const jobId = props.check.jobId ?? 0;
   const details = useCachedPromise(loadJob, [jobId], { execute: props.enabled && hasJob });
-  const job = details.data?.job;
+  const job = props.enabled ? details.data?.job : undefined;
   const finished = job?.status === "completed";
   const step = failedStep(job);
   const stepRef = step ? { name: step.name, startedAt: step.startedAt } : undefined;
@@ -47,9 +47,10 @@ export function useJobReport(props: {
   });
 
   let logState: LogState;
-  if (log.error) {
+  const logEnabled = props.enabled && props.wantLog;
+  if (logEnabled && log.error) {
     logState = { status: "error", message: logErrorMessage(log.error) };
-  } else if (log.data) {
+  } else if (logEnabled && log.data) {
     logState = { status: "loaded", summary: log.data };
   } else if (job && !finished) {
     logState = { status: "unavailable", reason: "Still running. The log is available once the job finishes." };
@@ -66,7 +67,7 @@ export function useJobReport(props: {
     check,
     pr: props.pr,
     job,
-    annotations: details.data?.annotations,
+    annotations: props.enabled ? details.data?.annotations : undefined,
     log: logState,
     repo: props.repo,
     sha: props.sha,
@@ -100,8 +101,11 @@ export function metadataRows(input: JobReportInput, url: string | undefined): Me
     },
   ];
   const stepName = failingStepName(job, input.log.status === "loaded" ? input.log.summary : undefined);
+  const running = currentStep(job);
   if (check.state === "failure" && url) {
     rows.push({ kind: "link", title: "Failure", text: stepName ?? "Open on GitHub", target: url });
+  } else if (running && url) {
+    rows.push({ kind: "link", title: "Running", text: running.name, target: url });
   } else if (url) {
     rows.push({ kind: "link", title: "Details", text: "Open on GitHub", target: url });
   }

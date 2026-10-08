@@ -1,12 +1,12 @@
 import { Cache, getPreferenceValues, LocalStorage } from "@raycast/api";
 import { useCachedPromise, useLocalStorage } from "@raycast/utils";
 import {
-  DEMO_ANNOTATIONS,
+  demoAnnotations,
   DEMO_CHOICES,
-  DEMO_LOG,
   DEMO_REPO,
   DEMO_REQUIRED_CHECKS,
   demoJob,
+  demoLog,
   demoQueue,
 } from "./lib/demo";
 import { findGh, GhError, RepoConfig, repoSlug } from "./lib/gh";
@@ -134,7 +134,7 @@ export function useRepoSearch(text: string, sort: RepoSort) {
 
 export async function loadJob(jobId: number) {
   if (demo) {
-    return { job: demoJob(), annotations: DEMO_ANNOTATIONS };
+    return { job: demoJob(jobId), annotations: demoAnnotations(jobId) };
   }
   const config = await getConfig();
   const [job, annotations] = await Promise.all([
@@ -145,7 +145,7 @@ export async function loadJob(jobId: number) {
 }
 
 export async function loadLogSummary(jobId: number, step?: StepRef) {
-  return summarizeLog(demo ? DEMO_LOG : await fetchJobLog(await getConfig(), jobId), step);
+  return summarizeLog(demo ? demoLog(jobId) : await fetchJobLog(await getConfig(), jobId), step);
 }
 
 export async function requestRerunFailed(runIds: number[]) {

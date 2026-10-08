@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { DEMO_ANNOTATIONS, DEMO_LOG, demoJob } from "../src/lib/demo";
+import { DEMO_ANNOTATIONS, DEMO_FAILING_JOB_ID, DEMO_LOG, demoJob, demoLog, demoQueue } from "../src/lib/demo";
 import { excerptAround, failureLineInStep, summarizeLog } from "../src/lib/logs";
 import {
   buildCopyText,
   buildJobMarkdown,
   buildPreviewMarkdown,
+  failedStep,
   failureErrors,
   failureUrl,
   keyErrors,
@@ -127,7 +128,7 @@ describe("failureLineInStep, GitHub's line numbers inside a step", () => {
 });
 
 describe("job report", () => {
-  const job = demoJob(new Date("2026-10-07T14:30:00Z"));
+  const job = demoJob(DEMO_FAILING_JOB_ID, new Date("2026-10-07T14:30:00Z"));
   const summary = summarizeLog(DEMO_LOG, { name: "Run Playwright" });
   const check = { name: "e2e (chromium)", state: "failure" as const, required: true, jobId: 9100, runId: 16100 };
   const input = {
@@ -168,6 +169,35 @@ describe("job report", () => {
     expect(markdown).toContain("**Run Playwright** · failure");
     expect(markdown).toContain("6 other steps passed or skipped");
     expect(markdown).not.toContain("Check out code");
+  });
+
+  it("shows a running job's steps with the current one in bold", () => {
+    const now = new Date("2026-10-07T14:30:00Z");
+    const running = demoQueue(
+      now,
+    ).repository!.mergeQueue!.entries.nodes[0].headCommit!.statusCheckRollup!.contexts.nodes.find(
+      (node) => node && "name" in node && node.name === "lighthouse",
+    ) as { databaseId: number };
+    const job = demoJob(running.databaseId, now);
+    const preview = buildPreviewMarkdown({
+      check: { name: "lighthouse", state: "pending", required: false, jobId: running.databaseId },
+      job,
+      log: { status: "unavailable", reason: "running" },
+    });
+    expect(preview).toMatch(/^Running · .+ · step 4 of 6\n/);
+    expect(preview).toContain("- ✓ Install dependencies");
+    expect(preview).toContain("- ◐ **Run tests**");
+    expect(preview).toContain("- ○ Upload results");
+    expect(failureUrl(job, { status: "idle" })).toBe(`${job.htmlUrl}#step:4:1`);
+  });
+
+  it("gives each demo check its own job, so a passing one never shows a failure", () => {
+    expect(failedStep(demoJob(9101))?.name).toBe("Run Lighthouse");
+    expect(summarizeLog(demoLog(9101)).errors).toEqual([
+      "Assertion failed: categories.performance 0.81 is below the 0.85 budget",
+    ]);
+    expect(demoJob(9003).conclusion).toBe("success");
+    expect(failedStep(demoJob(9003))).toBeUndefined();
   });
 
   it("says a passing check passed, without loading anything", () =>
