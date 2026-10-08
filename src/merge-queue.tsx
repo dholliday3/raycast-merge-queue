@@ -1,17 +1,28 @@
-import { Action, ActionPanel, Icon, Keyboard, LaunchProps, List, openExtensionPreferences } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Icon,
+  Keyboard,
+  LaunchProps,
+  List,
+  openExtensionPreferences,
+  useNavigation,
+} from "@raycast/api";
 import { ReactElement, useEffect, useState } from "react";
 import { ChecksList } from "./components/ChecksList";
 import { JobDetail } from "./components/JobDetail";
 import { entryAccessories, entryIcon, entryStatusText } from "./components/presentation";
 import { RepoPicker, SwitchRepository } from "./components/RepoPicker";
 import { confirmRerunFailedForEntry } from "./components/rerun";
-import { enableDemo, MergeQueueLaunchContext, useMergeQueue, useSelection } from "./data";
+import { enableDemo, MergeQueueLaunchContext, useMergeQueue, useRepoChoices, useSelection } from "./data";
 import { ordinal } from "./lib/format";
 import { setupCommand } from "./lib/gh";
 import { failingRunIds, primaryFailingJob, QueueEntry, QueueSnapshot } from "./lib/queue";
-import { RepoSelection } from "./lib/repos";
+import { RepoSelection, sameRepo, selectionKey, switchTargets } from "./lib/repos";
 
 type Filter = "all" | "mine" | "attention";
+
+const CHOOSE_REPOSITORY = "choose";
 
 const POLL_MS = 30_000;
 
@@ -132,7 +143,10 @@ function EntryItem(props: {
 
 export default function Command(props: LaunchProps<{ launchContext: MergeQueueLaunchContext }>) {
   enableDemo(props.launchContext?.demo);
-  const { selection, setSelection, isLoading: selectionLoading } = useSelection();
+  const { selection, recents, setSelection, isLoading: selectionLoading } = useSelection();
+  const cachedChoices = useRepoChoices({ execute: false });
+  const { push } = useNavigation();
+  const [dropdownKey, setDropdownKey] = useState(0);
   const queue = useMergeQueue(selection);
   const { error, isLoading, revalidate } = queue;
   const data = isSnapshotOf(queue.data, selection) ? queue.data : undefined;
@@ -158,7 +172,7 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
   useEffect(() => setSelectedId(undefined), [selection?.owner, selection?.name, selection?.branch]);
 
   if (!selection) {
-    return selectionLoading ? <List isLoading /> : <RepoPicker onPick={setSelection} />;
+    return selectionLoading ? <List isLoading /> : <RepoPicker autoPick onPick={setSelection} />;
   }
 
   const switchAction = (
@@ -177,6 +191,7 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
   }
 
   const entries = (data?.entries ?? []).filter((entry) => matchesFilter(entry, filter));
+  const repoTargets = switchTargets(selection, recents, cachedChoices.data ?? []);
   const command = setupCommand(error);
 
   return (
@@ -190,10 +205,47 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
         }
       }}
       searchBarAccessory={
-        <List.Dropdown tooltip="Show" value={filter} onChange={(value) => setFilter(value as Filter)}>
-          <List.Dropdown.Item title="Whole Queue" value="all" icon={Icon.List} />
-          <List.Dropdown.Item title="Mine" value="mine" icon={Icon.Person} />
-          <List.Dropdown.Item title="Needs Attention" value="attention" icon={Icon.XMarkCircle} />
+        <List.Dropdown
+          key={dropdownKey}
+          tooltip="Show or Switch Repository"
+          value={`filter:${filter}`}
+          onChange={(value) => {
+            if (value.startsWith("filter:")) {
+              setFilter(value.slice("filter:".length) as Filter);
+              return;
+            }
+            setDropdownKey((key) => key + 1);
+            if (value === CHOOSE_REPOSITORY) {
+              push(<SwitchRepository current={selection} onPick={setSelection} />);
+              return;
+            }
+            const target = repoTargets.find((candidate) => `repo:${selectionKey(candidate)}` === value);
+            if (target && !sameRepo(target, selection)) {
+              setFilter("all");
+              setSelection(target);
+            }
+          }}
+        >
+          <List.Dropdown.Section title="Show">
+            <List.Dropdown.Item title="Whole Queue" value="filter:all" icon={Icon.List} />
+            <List.Dropdown.Item title="Mine" value="filter:mine" icon={Icon.Person} />
+            <List.Dropdown.Item title="Needs Attention" value="filter:attention" icon={Icon.XMarkCircle} />
+          </List.Dropdown.Section>
+          <List.Dropdown.Section title="Repository">
+            {repoTargets.map((target) => (
+              <List.Dropdown.Item
+                key={selectionKey(target)}
+                title={`${target.owner}/${target.name}${target.branch ? ` · ${target.branch}` : ""}`}
+                value={`repo:${selectionKey(target)}`}
+                icon={sameRepo(target, selection) ? Icon.CheckCircle : Icon.Circle}
+              />
+            ))}
+            <List.Dropdown.Item
+              title="Choose Another Repository…"
+              value={CHOOSE_REPOSITORY}
+              icon={Icon.MagnifyingGlass}
+            />
+          </List.Dropdown.Section>
         </List.Dropdown>
       }
     >

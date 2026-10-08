@@ -13,13 +13,15 @@ import { findGh, GhError, RepoConfig, repoSlug } from "./lib/gh";
 import { Annotation, fetchAnnotations, fetchJob, fetchJobLog, rerunFailedJobs, rerunJob } from "./lib/jobs";
 import { summarizeLog } from "./lib/logs";
 import { fetchQueue, fetchRequiredChecks, parseQueue, QueueSnapshot } from "./lib/queue";
-import { fetchRepoChoices, RepoChoice, RepoSelection, RepoSort, searchRepoChoices } from "./lib/repos";
+import { fetchRepoChoices, rememberRecent, RepoChoice, RepoSelection, RepoSort, searchRepoChoices } from "./lib/repos";
 
 export type MergeQueueLaunchContext = { prNumber?: number; view?: "checks"; demo?: boolean };
 
 type CachedRequiredChecks = { fetchedAt: number; checks: string[] };
 
 const SELECTION_KEY = "repository";
+const RECENTS_KEY = "recent-repositories";
+const DEMO_RECENTS: RepoSelection[] = [DEMO_REPO, { owner: "acme", name: "payments", branch: "main" }];
 const REQUIRED_CHECKS_TTL_MS = 60 * 60 * 1000;
 const cache = new Cache();
 
@@ -56,8 +58,21 @@ export async function getConfig(): Promise<RepoConfig> {
 }
 
 export function useSelection() {
-  const { value, setValue, isLoading } = useLocalStorage<RepoSelection>(SELECTION_KEY);
-  return { selection: demo ? DEMO_REPO : value, setSelection: setValue, isLoading: isLoading && !demo };
+  const stored = useLocalStorage<RepoSelection>(SELECTION_KEY);
+  const recents = useLocalStorage<RepoSelection[]>(RECENTS_KEY, []);
+  const setSelection = async (selection: RepoSelection) => {
+    if (demo) {
+      return;
+    }
+    await stored.setValue(selection);
+    await recents.setValue(rememberRecent(recents.value ?? [], selection));
+  };
+  return {
+    selection: demo ? DEMO_REPO : stored.value,
+    recents: demo ? DEMO_RECENTS : (recents.value ?? []),
+    setSelection,
+    isLoading: stored.isLoading && !demo,
+  };
 }
 
 export function selectionFor(choice: RepoChoice, branch?: string): RepoSelection {
@@ -106,8 +121,8 @@ async function loadSearch(useDemo: boolean, text: string, sort: RepoSort): Promi
   return searchRepoChoices(ghConfig(), text, sort);
 }
 
-export function useRepoChoices() {
-  return useCachedPromise(loadChoices, [demo], { keepPreviousData: true });
+export function useRepoChoices(options: { execute?: boolean } = {}) {
+  return useCachedPromise(loadChoices, [demo], { keepPreviousData: true, execute: options.execute ?? true });
 }
 
 export function useRepoSearch(text: string, sort: RepoSort) {

@@ -7,13 +7,15 @@ import {
   Keyboard,
   List,
   openExtensionPreferences,
+  showToast,
+  Toast,
   useNavigation,
 } from "@raycast/api";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { selectionFor, useRepoChoices, useRepoSearch } from "../data";
 import { formatAgo } from "../lib/format";
 import { setupCommand } from "../lib/gh";
-import { groupChoices, parseTypedRepo, RepoChoice, RepoSelection, RepoSort } from "../lib/repos";
+import { groupChoices, obviousChoice, parseTypedRepo, RepoChoice, RepoSelection, RepoSort } from "../lib/repos";
 
 function queueText(choice: RepoChoice): string | undefined {
   if (choice.yourQueued > 0) {
@@ -99,7 +101,11 @@ function Sections(props: {
   );
 }
 
-export function RepoPicker(props: { current?: RepoSelection; onPick: (selection: RepoSelection) => void }) {
+export function RepoPicker(props: {
+  current?: RepoSelection;
+  onPick: (selection: RepoSelection) => void;
+  autoPick?: boolean;
+}) {
   const [text, setText] = useState("");
   const [sort, setSort] = useState<RepoSort>("pushed");
   const searching = text.trim().length >= 2;
@@ -107,6 +113,23 @@ export function RepoPicker(props: { current?: RepoSelection; onPick: (selection:
   const search = useRepoSearch(text, sort);
   const typed = parseTypedRepo(text);
   const error = searching ? search.error : choices.error;
+  const autoPicked = useRef(false);
+
+  useEffect(() => {
+    if (!props.autoPick || autoPicked.current || text || choices.isLoading || !choices.data) {
+      return;
+    }
+    autoPicked.current = true;
+    const choice = obviousChoice(choices.data);
+    if (choice) {
+      props.onPick(selectionFor(choice));
+      showToast({
+        style: Toast.Style.Success,
+        title: `Showing ${choice.slug}`,
+        message: "Switch from the dropdown or with ⇧⌘P",
+      });
+    }
+  }, [props.autoPick, text, choices.isLoading, choices.data]);
   const command = setupCommand(error);
   const needle = text.trim().toLowerCase();
   const yours = (choices.data ?? []).filter((choice) => choice.slug.toLowerCase().includes(needle));

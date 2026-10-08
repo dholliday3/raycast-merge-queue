@@ -22,13 +22,13 @@ Install and sign in to the [GitHub CLI](https://cli.github.com): `brew install g
 
 ## Choosing a Repository
 
-The first time you open **Merge Queue** it lists repositories to pick from, and `⇧⌘P` brings the list back to switch:
+Most people watch one queue, so the extension remembers yours and opens straight to it. The first time, if you have a pull request queued in exactly one repository, or only one of your repositories has a merge queue, it picks that one for you. Otherwise it lists repositories to choose from:
 
 - **Your Queued Pull Requests**: repositories where one of your pull requests is in a merge queue right now
 - **Merge Queue On**: your most recently pushed repositories, and ones you've contributed to, that have a merge queue
 - **Your Other Repositories**: the rest, for a queue the extension couldn't detect
 
-Type to search all of GitHub, sorted by recent pushes, stars, or best match. Type `owner/name` to go straight to a repository, or `owner/name:branch` for a queue on a branch the extension can't detect.
+To switch, use the **Repository** section of the dropdown next to the search bar (`⌘P`), which lists the current repository, recent ones and your other repositories with a merge queue, or press `⇧⌘P` for the full list. Type to search all of GitHub, sorted by recent pushes, stars, or best match. Type `owner/name` to go straight to a repository, or `owner/name:branch` for a queue on a branch the extension can't detect.
 
 A queue is detected on the default branch, on a branch named in a ruleset with a merge queue rule, or on the base branch of your queued pull requests. **GitHub CLI Path** is found automatically in `/opt/homebrew/bin`, `/usr/local/bin` or `/usr/bin`; set it in preferences if `gh` lives somewhere else.
 

@@ -232,3 +232,44 @@ export async function searchRepoChoices(
   ]);
   return parseSearch(data, exact);
 }
+
+export function obviousChoice(choices: RepoChoice[]): RepoChoice | undefined {
+  const { yours, withQueue } = groupChoices(choices);
+  if (yours.length > 0) {
+    return yours.length === 1 ? yours[0] : undefined;
+  }
+  return withQueue.length === 1 ? withQueue[0] : undefined;
+}
+
+export function sameRepo(a: RepoSelection | undefined, b: RepoSelection | undefined): boolean {
+  return Boolean(a && b && `${a.owner}/${a.name}`.toLowerCase() === `${b.owner}/${b.name}`.toLowerCase());
+}
+
+export function selectionKey(selection: RepoSelection): string {
+  return `${selection.owner}/${selection.name}${selection.branch ? `:${selection.branch}` : ""}`;
+}
+
+export function rememberRecent(recents: RepoSelection[], selection: RepoSelection, max = 6): RepoSelection[] {
+  return [selection, ...recents.filter((recent) => !sameRepo(recent, selection))].slice(0, max);
+}
+
+export function switchTargets(
+  current: RepoSelection,
+  recents: RepoSelection[],
+  choices: RepoChoice[],
+  max = 8,
+): RepoSelection[] {
+  const { yours, withQueue } = groupChoices(choices);
+  const candidates = [
+    current,
+    ...recents,
+    ...[...yours, ...withQueue].map((choice) => ({
+      owner: choice.owner,
+      name: choice.name,
+      branch: choice.queueBranch,
+    })),
+  ];
+  return candidates
+    .filter((candidate, index) => candidates.findIndex((other) => sameRepo(other, candidate)) === index)
+    .slice(0, max);
+}

@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   ChoicesResponse,
   groupChoices,
+  obviousChoice,
   parseChoices,
   parseSearch,
   parseTypedRepo,
   RawRepo,
+  rememberRecent,
   rulesetQueueBranch,
   searchText,
+  switchTargets,
   toChoice,
 } from "../src/lib/repos";
 
@@ -140,4 +143,43 @@ describe("parseTypedRepo", () => {
   it("reads a GitHub URL", () =>
     expect(parseTypedRepo("https://github.com/acme/web.git")).toMatchObject({ owner: "acme", name: "web" }));
   it("ignores plain words", () => expect(parseTypedRepo("web app")).toBeUndefined());
+});
+
+describe("obviousChoice", () => {
+  const queued = (slug: string) => toChoice(repo(slug), { branch: "main", count: 1 });
+  const withQueue = (slug: string) => toChoice(repo(slug, { mergeQueue: { entries: { totalCount: 0 } } }));
+  const plain = (slug: string) => toChoice(repo(slug));
+
+  it("picks the one repo with your queued PR, even when others have queues", () =>
+    expect(obviousChoice([withQueue("a/x"), queued("a/mine"), plain("a/z")])?.slug).toBe("a/mine"));
+  it("picks the only repo with a merge queue", () =>
+    expect(obviousChoice([plain("a/z"), withQueue("a/x")])?.slug).toBe("a/x"));
+  it("asks when your PRs are queued in two repos", () =>
+    expect(obviousChoice([queued("a/one"), queued("a/two")])).toBeUndefined());
+  it("asks when several repos have queues", () =>
+    expect(obviousChoice([withQueue("a/x"), withQueue("a/y")])).toBeUndefined());
+  it("asks when none do", () => expect(obviousChoice([plain("a/z")])).toBeUndefined());
+});
+
+describe("switching repositories", () => {
+  const web = { owner: "acme", name: "web", branch: "main" };
+  const api = { owner: "acme", name: "api" };
+
+  it("remembers the latest pick first, once, up to a limit", () => {
+    expect(rememberRecent([api, web], { owner: "ACME", name: "Web" })).toEqual([{ owner: "ACME", name: "Web" }, api]);
+    expect(rememberRecent([api, web], { owner: "x", name: "y" }, 2)).toEqual([{ owner: "x", name: "y" }, api]);
+  });
+
+  it("offers the current repo, then recents, then other repos with a queue", () => {
+    const choices = [
+      toChoice(repo("acme/web", { mergeQueue: { entries: { totalCount: 0 } } })),
+      toChoice(repo("acme/mobile", { rulesets: { nodes: [queueRuleset(["refs/heads/develop"])] } })),
+      toChoice(repo("acme/docs")),
+    ];
+    expect(switchTargets(web, [web, api], choices)).toEqual([
+      web,
+      api,
+      { owner: "acme", name: "mobile", branch: "develop" },
+    ]);
+  });
 });
