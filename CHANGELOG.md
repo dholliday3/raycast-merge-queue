@@ -12,3 +12,4 @@
 - Pick a repository in the command: your queued pull requests' repositories and your active ones with a merge queue come first, or search all of GitHub by recent pushes, stars, or best match
 - Detects the queue's branch from the default branch, rulesets, or your queued pull requests
 - Reads through the GitHub CLI, with nothing to configure
+- Plain-language errors with a fix for each: install or sign in to gh, a repository you can't see, one without a merge queue (choose another or enter its branch), offline, and rate limits

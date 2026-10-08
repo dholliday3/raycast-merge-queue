@@ -1,20 +1,9 @@
-import {
-  Action,
-  ActionPanel,
-  Color,
-  Icon,
-  Image,
-  Keyboard,
-  List,
-  openExtensionPreferences,
-  showToast,
-  Toast,
-  useNavigation,
-} from "@raycast/api";
+import { Action, ActionPanel, Color, Icon, Image, Keyboard, List, showToast, Toast, useNavigation } from "@raycast/api";
 import { useEffect, useRef, useState } from "react";
 import { selectionFor, useRepoChoices, useRepoSearch } from "../data";
 import { formatAgo } from "../lib/format";
-import { setupCommand } from "../lib/gh";
+import { MERGE_QUEUE_DOCS } from "../lib/errors";
+import { ErrorEmptyView } from "./ErrorView";
 import { groupChoices, obviousChoice, parseTypedRepo, RepoChoice, RepoSelection, RepoSort } from "../lib/repos";
 
 function queueText(choice: RepoChoice): string | undefined {
@@ -130,10 +119,12 @@ export function RepoPicker(props: {
       });
     }
   }, [props.autoPick, text, choices.isLoading, choices.data]);
-  const command = setupCommand(error);
   const needle = text.trim().toLowerCase();
   const yours = (choices.data ?? []).filter((choice) => choice.slug.toLowerCase().includes(needle));
   const shown = searching && search.data ? search.data : yours;
+  const all = choices.data ?? [];
+  const noQueues =
+    !searching && !choices.isLoading && all.length > 0 && all.every((choice) => choice.queueBranch === undefined);
 
   return (
     <List
@@ -151,21 +142,7 @@ export function RepoPicker(props: {
       }
     >
       {error && shown.length === 0 ? (
-        <List.EmptyView
-          icon={Icon.Warning}
-          title={searching ? "Couldn't search GitHub" : "Couldn't list your repositories"}
-          description={
-            command ? `${error.message}\n\nCopy the setup command (↵) and run it in a terminal.` : error.message
-          }
-          actions={
-            <ActionPanel>
-              {command ? (
-                <Action.CopyToClipboard title="Copy Setup Command" content={command} icon={Icon.Terminal} />
-              ) : null}
-              <Action title="Open Extension Preferences" icon={Icon.Gear} onAction={openExtensionPreferences} />
-            </ActionPanel>
-          }
-        />
+        <ErrorEmptyView error={error} onRetry={searching ? search.revalidate : choices.revalidate} />
       ) : (searching ? search.isLoading : choices.isLoading) ? null : (
         <List.EmptyView
           icon={Icon.MagnifyingGlass}
@@ -173,6 +150,20 @@ export function RepoPicker(props: {
           description="Type a name to search GitHub, or owner/name to go straight to one."
         />
       )}
+      {noQueues ? (
+        <List.Section title="No Merge Queues Found">
+          <List.Item
+            icon={Icon.Info}
+            title="None of your repositories has a merge queue"
+            subtitle="Search GitHub above, or type owner/name:branch"
+            actions={
+              <ActionPanel>
+                <Action.OpenInBrowser title="Learn About Merge Queues" url={MERGE_QUEUE_DOCS} />
+              </ActionPanel>
+            }
+          />
+        </List.Section>
+      ) : null}
       {typed?.branch ? (
         <List.Section title="Typed">
           <List.Item

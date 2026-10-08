@@ -324,11 +324,14 @@ export function parseQueue(
 ): QueueSnapshot {
   const branch = queueBranch(config, data);
   if (!data.repository) {
-    throw new GhError(`Couldn't find ${repoSlug(config)}. Check the repository name and that gh can see it.`);
+    throw new GhError(`Couldn't find ${repoSlug(config)}`, "not-found", { repo: repoSlug(config) });
   }
   const queue = data.repository.mergeQueue;
   if (!queue) {
-    throw new GhError(`${repoSlug(config)} has no merge queue on ${branch}`);
+    throw new GhError(`${repoSlug(config)} has no merge queue on ${branch}`, "no-queue", {
+      repo: repoSlug(config),
+      branch,
+    });
   }
   const required = new Set(requiredChecks);
   const viewer = data.viewer.login;
@@ -354,6 +357,11 @@ export async function fetchQueue(
     owner: config.owner,
     name: config.name,
     branch: config.branch || undefined,
+  }).catch((error: unknown) => {
+    if (error instanceof GhError && error.kind === "not-found") {
+      throw new GhError(error.message, "not-found", { repo: repoSlug(config) });
+    }
+    throw error;
   });
   return parseQueue(config, data, await requiredChecksFor(queueBranch(config, data)));
 }

@@ -13,7 +13,8 @@ import {
 import { checkIcon, entryIcon, entryStatusText } from "./components/presentation";
 import { MergeQueueLaunchContext, requestRerunFailed, useMergeQueue, useSelection } from "./data";
 import { formatAgo, formatSeconds, truncate } from "./lib/format";
-import { setupCommand } from "./lib/gh";
+import { errorIcon } from "./components/ErrorView";
+import { describeError } from "./lib/errors";
 import { failingRunIds, Health, QueueEntry, QueueSnapshot } from "./lib/queue";
 
 const SEVERITY: Health[] = ["failing", "conflict", "running", "queued", "merging", "passing"];
@@ -36,7 +37,7 @@ async function rerunFromMenu(entry: QueueEntry) {
     await requestRerunFailed(failingRunIds(entry));
     await showHUD(`Rerunning failed jobs for #${entry.pr.number}`);
   } catch (error) {
-    await showHUD(`Rerun failed: ${errorMessage(error)}`);
+    await showHUD(`Couldn't rerun: ${describeError(error).title}`);
   }
 }
 
@@ -125,7 +126,7 @@ export default function Command() {
   const { selection, isLoading: selectionLoading } = useSelection();
   const { data, error, isLoading, revalidate } = useMergeQueue(selection);
   const mine = data?.entries.filter((entry) => entry.isMine) ?? [];
-  const command = setupCommand(error);
+  const advice = error ? describeError(error) : undefined;
 
   if (!selection) {
     return (
@@ -143,26 +144,39 @@ export default function Command() {
 
   return (
     <MenuBarExtra
-      icon={error && !data ? Icon.Warning : menuBarIcon(mine)}
+      icon={advice && !data ? { source: errorIcon(advice) } : menuBarIcon(mine)}
       title={menuBarTitle(mine)}
       tooltip={tooltip(data)}
       isLoading={isLoading}
     >
-      {error && !data ? (
+      {advice && !data ? (
         <MenuBarExtra.Section>
-          <MenuBarExtra.Item title="Couldn't load the merge queue" subtitle={error.message} icon={Icon.Warning} />
-          {command ? (
+          <MenuBarExtra.Item title={advice.title} tooltip={advice.description} icon={errorIcon(advice)} />
+          {advice.canSwitch ? (
             <MenuBarExtra.Item
-              title="Copy Setup Command"
-              subtitle={command}
+              title="Choose Another Repository…"
+              icon={Icon.Switch}
+              onAction={() => openInRaycast({ view: "repositories" })}
+            />
+          ) : null}
+          {advice.command ? (
+            <MenuBarExtra.Item
+              title={advice.kind === "not-found" ? "Copy Status Command" : "Copy Setup Command"}
+              subtitle={advice.command}
               icon={Icon.Terminal}
               onAction={async () => {
-                await Clipboard.copy(command);
+                await Clipboard.copy(advice.command as string);
                 await showHUD("Copied. Run it in a terminal.");
               }}
             />
           ) : null}
-          <MenuBarExtra.Item title="Open Extension Preferences" icon={Icon.Gear} onAction={openExtensionPreferences} />
+          {advice.kind === "missing" ? (
+            <MenuBarExtra.Item
+              title="Open Extension Preferences"
+              icon={Icon.Gear}
+              onAction={openExtensionPreferences}
+            />
+          ) : null}
         </MenuBarExtra.Section>
       ) : null}
       {mine.length > 0 ? (
@@ -201,7 +215,14 @@ export default function Command() {
           shortcut={Keyboard.Shortcut.Common.Refresh}
           onAction={revalidate}
         />
-        {data ? <MenuBarExtra.Item title={`Updated ${formatAgo(data.fetchedAt)}`} /> : null}
+        {data ? (
+          <MenuBarExtra.Item
+            title={`Updated ${formatAgo(data.fetchedAt)}`}
+            subtitle={advice ? `couldn't refresh: ${advice.title}` : undefined}
+            icon={advice ? errorIcon(advice) : undefined}
+            tooltip={advice?.description}
+          />
+        ) : null}
       </MenuBarExtra.Section>
     </MenuBarExtra>
   );

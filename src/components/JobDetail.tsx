@@ -2,6 +2,7 @@ import { Action, ActionPanel, Color, Detail, Icon, Keyboard } from "@raycast/api
 import { useCachedPromise } from "@raycast/utils";
 import { useState } from "react";
 import { loadJob, loadLogSummary } from "../data";
+import { logErrorMessage } from "../lib/errors";
 import { formatSeconds, secondsBetween } from "../lib/format";
 import { jobState } from "../lib/jobs";
 import { Check, PullRequestSummary } from "../lib/queue";
@@ -37,7 +38,7 @@ export function JobDetail(props: { check: Check & { jobId: number }; pr?: PullRe
 
   let logState: LogState;
   if (log.error) {
-    logState = { status: "error", message: log.error.message };
+    logState = { status: "error", message: logErrorMessage(log.error) };
   } else if (log.data) {
     logState = { status: "loaded", summary: log.data };
   } else if (job && !jobFinished) {

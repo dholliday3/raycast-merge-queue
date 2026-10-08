@@ -1,22 +1,14 @@
-import {
-  Action,
-  ActionPanel,
-  Icon,
-  Keyboard,
-  LaunchProps,
-  List,
-  openExtensionPreferences,
-  useNavigation,
-} from "@raycast/api";
+import { Action, ActionPanel, Icon, Keyboard, LaunchProps, List, useNavigation } from "@raycast/api";
 import { ReactElement, useEffect, useState } from "react";
 import { ChecksList } from "./components/ChecksList";
+import { EnterBranch, ErrorEmptyView } from "./components/ErrorView";
 import { JobDetail } from "./components/JobDetail";
 import { entryAccessories, entryIcon, entryStatusText } from "./components/presentation";
 import { RepoPicker, SwitchRepository } from "./components/RepoPicker";
 import { confirmRerunFailedForEntry } from "./components/rerun";
 import { enableDemo, MergeQueueLaunchContext, useMergeQueue, useRepoChoices, useSelection } from "./data";
 import { ordinal } from "./lib/format";
-import { setupCommand } from "./lib/gh";
+import { describeError } from "./lib/errors";
 import { failingRunIds, primaryFailingJob, QueueEntry, QueueSnapshot } from "./lib/queue";
 import { RepoSelection, sameRepo, selectionKey, switchTargets } from "./lib/repos";
 
@@ -40,13 +32,14 @@ function matchesFilter(entry: QueueEntry, filter: Filter): boolean {
   return true;
 }
 
-function sectionSubtitle(snapshot: QueueSnapshot): string {
+function sectionSubtitle(snapshot: QueueSnapshot, staleError?: Error): string {
   const attention = snapshot.entries.filter(needsAttention).length;
   const mine = snapshot.entries.find((entry) => entry.isMine);
   return [
     `${snapshot.entries.length} queued`,
     mine ? `you're ${ordinal(mine.position)}` : undefined,
     attention ? `${attention} need attention` : undefined,
+    staleError ? `⚠ couldn't refresh: ${describeError(staleError).title}` : undefined,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -153,6 +146,7 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<string>();
   const context = props.launchContext;
+  const [choosing, setChoosing] = useState(context?.view === "repositories");
 
   useEffect(() => {
     const timer = setInterval(revalidate, POLL_MS);
@@ -171,8 +165,20 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
 
   useEffect(() => setSelectedId(undefined), [selection?.owner, selection?.name, selection?.branch]);
 
-  if (!selection) {
-    return selectionLoading ? <List isLoading /> : <RepoPicker autoPick onPick={setSelection} />;
+  if (selectionLoading) {
+    return <List isLoading />;
+  }
+  if (!selection || choosing) {
+    return (
+      <RepoPicker
+        autoPick={!selection}
+        current={selection}
+        onPick={(picked) => {
+          setSelection(picked);
+          setChoosing(false);
+        }}
+      />
+    );
   }
 
   const switchAction = (
@@ -192,7 +198,20 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
 
   const entries = (data?.entries ?? []).filter((entry) => matchesFilter(entry, filter));
   const repoTargets = switchTargets(selection, recents, cachedChoices.data ?? []);
-  const command = setupCommand(error);
+  const chooseAnother = (
+    <Action.Push
+      title="Choose Another Repository"
+      icon={Icon.Switch}
+      target={<SwitchRepository current={selection} onPick={setSelection} />}
+    />
+  );
+  const enterBranch = (
+    <Action.Push
+      title="Enter Queue Branch…"
+      icon={Icon.Code}
+      target={<EnterBranch selection={selection} onPick={setSelection} />}
+    />
+  );
 
   return (
     <List
@@ -250,23 +269,7 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
       }
     >
       {error && !data ? (
-        <List.EmptyView
-          icon={Icon.Warning}
-          title="Couldn't load the merge queue"
-          description={
-            command ? `${error.message}\n\nCopy the setup command (↵) and run it in a terminal.` : error.message
-          }
-          actions={
-            <ActionPanel>
-              {command ? (
-                <Action.CopyToClipboard title="Copy Setup Command" content={command} icon={Icon.Terminal} />
-              ) : null}
-              <Action title="Retry" icon={Icon.ArrowClockwise} onAction={revalidate} />
-              {switchAction}
-              <Action title="Open Extension Preferences" icon={Icon.Gear} onAction={openExtensionPreferences} />
-            </ActionPanel>
-          }
-        />
+        <ErrorEmptyView error={error} onRetry={revalidate} switchAction={chooseAnother} branchAction={enterBranch} />
       ) : null}
       {data && entries.length === 0 ? (
         <List.EmptyView
@@ -282,7 +285,7 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
         />
       ) : null}
       {data ? (
-        <List.Section title={`${data.repo} · ${data.branch}`} subtitle={sectionSubtitle(data)}>
+        <List.Section title={`${data.repo} · ${data.branch}`} subtitle={sectionSubtitle(data, error)}>
           {entries.map((entry) => (
             <EntryItem
               key={entry.id}

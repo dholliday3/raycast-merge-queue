@@ -15,7 +15,7 @@ import { summarizeLog } from "./lib/logs";
 import { fetchQueue, fetchRequiredChecks, parseQueue, QueueSnapshot } from "./lib/queue";
 import { fetchRepoChoices, rememberRecent, RepoChoice, RepoSelection, RepoSort, searchRepoChoices } from "./lib/repos";
 
-export type MergeQueueLaunchContext = { prNumber?: number; view?: "checks"; demo?: boolean };
+export type MergeQueueLaunchContext = { prNumber?: number; view?: "checks" | "repositories"; demo?: boolean };
 
 type CachedRequiredChecks = { fetchedAt: number; checks: string[] };
 

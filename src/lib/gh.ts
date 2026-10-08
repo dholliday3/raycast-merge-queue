@@ -9,15 +9,41 @@ export type RepoConfig = {
   branch?: string;
 };
 
-export type GhErrorKind = "missing" | "unauthenticated" | "other";
+export type GhErrorKind =
+  | "missing"
+  | "unauthenticated"
+  | "not-found"
+  | "gone"
+  | "no-queue"
+  | "offline"
+  | "rate-limited"
+  | "forbidden"
+  | "other";
 
 export class GhError extends Error {
   constructor(
     message: string,
     readonly kind: GhErrorKind = "other",
+    readonly details: { repo?: string; branch?: string } = {},
   ) {
     super(message);
   }
+}
+
+const ERROR_PATTERNS: [GhErrorKind, RegExp][] = [
+  ["unauthenticated", /gh auth login|not logged in|authentication required|bad credentials|HTTP 401/i],
+  ["rate-limited", /rate limit/i],
+  ["not-found", /Could not resolve to a Repository|HTTP 404/i],
+  ["gone", /HTTP 410/i],
+  ["forbidden", /HTTP 403|Resource not accessible|must have (admin|write)/i],
+  [
+    "offline",
+    /error connecting to|dial tcp|no such host|i\/o timeout|network is unreachable|connection (refused|reset)|TLS handshake timeout|context deadline exceeded/i,
+  ],
+];
+
+export function classifyGhMessage(message: string): GhErrorKind {
+  return ERROR_PATTERNS.find(([, pattern]) => pattern.test(message))?.[0] ?? "other";
 }
 
 const GH_CANDIDATES = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh"];
@@ -44,7 +70,6 @@ export function parseRepository(value: string): { owner: string; name: string } 
 }
 
 const MAX_OUTPUT_BYTES = 256 * 1024 * 1024;
-const NOT_SIGNED_IN = /gh auth login|not logged in|authentication required/i;
 
 export function gh(config: Pick<RepoConfig, "ghPath">, args: string[]): Promise<string> {
   const path = [dirname(config.ghPath), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"].join(":");
@@ -66,15 +91,7 @@ export function gh(config: Pick<RepoConfig, "ghPath">, args: string[]): Promise<
           return;
         }
         const message = stderr.trim().replace(/^gh: /, "") || error.message;
-        if (/Could not resolve to a Repository/.test(message)) {
-          reject(new GhError(`${message} Check the name, and that the account gh is signed in to can see it.`));
-          return;
-        }
-        if (NOT_SIGNED_IN.test(message)) {
-          reject(new GhError("The GitHub CLI isn't signed in. Run gh auth login in a terminal.", "unauthenticated"));
-          return;
-        }
-        reject(new GhError(message.length > 400 ? `${message.slice(0, 400)}…` : message));
+        reject(new GhError(message.length > 400 ? `${message.slice(0, 400)}…` : message, classifyGhMessage(message)));
       },
     );
   });
@@ -105,12 +122,19 @@ export async function rest<T>(config: Pick<RepoConfig, "ghPath">, path: string):
   return JSON.parse(await gh(config, ["api", path])) as T;
 }
 
+export function errorKind(error: unknown): GhErrorKind {
+  return error instanceof GhError ? error.kind : "other";
+}
+
 export function setupCommand(error: unknown): string | undefined {
-  if (!(error instanceof GhError)) {
-    return undefined;
+  switch (errorKind(error)) {
+    case "missing":
+      return "brew install gh && gh auth login";
+    case "unauthenticated":
+      return "gh auth login";
+    case "not-found":
+      return "gh auth status";
+    default:
+      return undefined;
   }
-  if (error.kind === "missing") {
-    return "brew install gh && gh auth login";
-  }
-  return error.kind === "unauthenticated" ? "gh auth login" : undefined;
 }
