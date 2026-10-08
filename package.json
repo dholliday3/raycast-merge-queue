@@ -59,7 +59,8 @@
     "lint": "ray lint",
     "fix-lint": "ray lint --fix",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "publish": "npx @raycast/api@latest publish"
   },
   "dependencies": {
     "@raycast/api": "^2.7.1",
