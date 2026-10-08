@@ -49,10 +49,24 @@ describe("parseQueue", () => {
     expect([entry.requiredDone, entry.requiredTotal]).toEqual([4, 6]);
   });
 
-  it("sorts failures first, then running, then the rest", () => {
-    const states = byNumber(4815).checks.map((check) => check.state);
-    expect(states.slice(0, 2)).toEqual(["failure", "failure"]);
-    expect(states.slice(2).every((state) => state === "success")).toBe(true);
+  it("sorts failed, then running, then finished, keeping GitHub's order within each", () => {
+    expect(
+      byNumber(4815)
+        .checks.map((check) => check.name)
+        .slice(0, 3),
+    ).toEqual(["e2e (chromium)", "lighthouse", "build"]);
+    expect(byNumber(4807).checks.map((check) => check.name)).toEqual([
+      "migrations",
+      "e2e (chromium)",
+      "e2e (webkit)",
+      "lighthouse",
+      "build",
+      "lint",
+      "typecheck",
+      "unit tests",
+      "bundle size",
+      "security audit",
+    ]);
   });
 
   it("uses the branch from preferences, else the repository's default", () => {

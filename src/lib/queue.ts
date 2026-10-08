@@ -156,7 +156,7 @@ query($owner: String!, $name: String!, $branch: String) {
 
 const FAILED_CONCLUSIONS = new Set(["FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE"]);
 
-const STATE_ORDER: Record<CheckState, number> = { failure: 0, pending: 1, success: 2, neutral: 3, skipped: 4 };
+const STATE_ORDER: Record<CheckState, number> = { failure: 0, pending: 1, success: 2, neutral: 2, skipped: 2 };
 
 function checkRunState(status: string, conclusion: string | null): CheckState {
   if (status !== "COMPLETED") {
@@ -211,11 +211,7 @@ function toCheck(raw: RawCheckRun | RawStatusContext, required: Set<string>): Ch
 }
 
 export function compareChecks(a: Check, b: Check): number {
-  return (
-    STATE_ORDER[a.state] - STATE_ORDER[b.state] ||
-    Number(b.required) - Number(a.required) ||
-    a.name.localeCompare(b.name)
-  );
+  return STATE_ORDER[a.state] - STATE_ORDER[b.state];
 }
 
 function healthOf(state: string, checks: Check[], failingRequired: Check[]): Health {

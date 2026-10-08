@@ -3,7 +3,7 @@
 ## [Initial Version] - {PR_MERGE_DATE}
 
 - Merge Queue: every entry in order with its state, required-check progress, ETA, and failing checks; filter to yours or the ones that need attention
-- Checks in two columns: only what's failing on the left, a preview of the selected failure on the right with errors linked to the file and line, failed and flaky tests, and the log around the error
+- Checks in two columns: every check on the left, failed first, then running, then finished, a preview of the selected failure on the right with errors linked to the file and line, failed and flaky tests, and the log around the error
 - Links straight to the failing line of the log on GitHub
 - Full report per job with the failed step, errors, tests and log; copy a failure summary with links to paste into chat
 - Rerun failed jobs or a single job, with a confirmation first
