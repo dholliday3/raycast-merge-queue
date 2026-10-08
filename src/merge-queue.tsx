@@ -9,6 +9,7 @@ import { confirmRerunFailedForEntry } from "./components/rerun";
 import { enableDemo, MergeQueueLaunchContext, useMergeQueue, useRepoChoices, useSelection } from "./data";
 import { ordinal } from "./lib/format";
 import { describeError } from "./lib/errors";
+import { needsSignIn } from "./lib/gh";
 import { failingRunIds, primaryFailingJob, QueueEntry, QueueSnapshot } from "./lib/queue";
 import { RepoSelection, sameRepo, selectionKey, switchTargets } from "./lib/repos";
 
@@ -17,6 +18,7 @@ type Filter = "all" | "mine" | "attention";
 const CHOOSE_REPOSITORY = "choose";
 
 const POLL_MS = 30_000;
+const SIGN_IN_POLL_MS = 5_000;
 
 function needsAttention(entry: QueueEntry): boolean {
   return entry.health === "failing" || entry.health === "conflict";
@@ -142,7 +144,7 @@ function EntryItem(props: {
 }
 
 export default function Command(props: LaunchProps<{ launchContext: MergeQueueLaunchContext }>) {
-  enableDemo(props.launchContext?.demo);
+  enableDemo(props.launchContext?.demo, props.launchContext?.demoError);
   const context = props.launchContext;
   const { selection, recents, setSelection, isLoading: selectionLoading } = useSelection();
   const cachedChoices = useRepoChoices({ execute: false });
@@ -161,10 +163,11 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
   const selectedId = initialSelection.current?.repo === repoKey ? initialSelection.current.id : undefined;
   const [choosing, setChoosing] = useState(context?.view === "repositories");
 
+  const waitingForSignIn = needsSignIn(error);
   useEffect(() => {
-    const timer = setInterval(revalidate, POLL_MS);
+    const timer = setInterval(revalidate, waitingForSignIn ? SIGN_IN_POLL_MS : POLL_MS);
     return () => clearInterval(timer);
-  }, [revalidate]);
+  }, [revalidate, waitingForSignIn]);
 
   if (selectionLoading) {
     return <List isLoading />;

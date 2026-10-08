@@ -358,8 +358,8 @@ export async function fetchQueue(
     name: config.name,
     branch: config.branch || undefined,
   }).catch((error: unknown) => {
-    if (error instanceof GhError && error.kind === "not-found") {
-      throw new GhError(error.message, "not-found", { repo: repoSlug(config) });
+    if (error instanceof GhError && (error.kind === "not-found" || error.kind === "sso")) {
+      throw new GhError(error.message, error.kind, { ...error.details, repo: repoSlug(config) });
     }
     throw error;
   });

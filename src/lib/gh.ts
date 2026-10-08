@@ -12,6 +12,8 @@ export type RepoConfig = {
 export type GhErrorKind =
   | "missing"
   | "unauthenticated"
+  | "expired"
+  | "sso"
   | "not-found"
   | "gone"
   | "no-queue"
@@ -24,14 +26,16 @@ export class GhError extends Error {
   constructor(
     message: string,
     readonly kind: GhErrorKind = "other",
-    readonly details: { repo?: string; branch?: string } = {},
+    readonly details: { repo?: string; branch?: string; url?: string } = {},
   ) {
     super(message);
   }
 }
 
 const ERROR_PATTERNS: [GhErrorKind, RegExp][] = [
-  ["unauthenticated", /gh auth login|not logged in|authentication required|bad credentials|HTTP 401/i],
+  ["sso", /SAML enforcement|single sign-on|\bSSO\b/i],
+  ["expired", /bad credentials|HTTP 401|token (has )?(expired|been revoked)/i],
+  ["unauthenticated", /gh auth login|not logged in|authentication required/i],
   ["rate-limited", /rate limit/i],
   ["not-found", /Could not resolve to a Repository|HTTP 404/i],
   ["gone", /HTTP 410/i],
@@ -44,6 +48,10 @@ const ERROR_PATTERNS: [GhErrorKind, RegExp][] = [
 
 export function classifyGhMessage(message: string): GhErrorKind {
   return ERROR_PATTERNS.find(([, pattern]) => pattern.test(message))?.[0] ?? "other";
+}
+
+export function ssoUrl(message: string): string | undefined {
+  return /https:\/\/github\.com\/(?:orgs|enterprises)\/[^\s)"']+\/sso[^\s)"']*/.exec(message)?.[0];
 }
 
 const GH_CANDIDATES = ["/opt/homebrew/bin/gh", "/usr/local/bin/gh", "/usr/bin/gh"];
@@ -91,7 +99,11 @@ export function gh(config: Pick<RepoConfig, "ghPath">, args: string[]): Promise<
           return;
         }
         const message = stderr.trim().replace(/^gh: /, "") || error.message;
-        reject(new GhError(message.length > 400 ? `${message.slice(0, 400)}…` : message, classifyGhMessage(message)));
+        reject(
+          new GhError(message.length > 400 ? `${message.slice(0, 400)}…` : message, classifyGhMessage(message), {
+            url: ssoUrl(message),
+          }),
+        );
       },
     );
   });
@@ -126,15 +138,24 @@ export function errorKind(error: unknown): GhErrorKind {
   return error instanceof GhError ? error.kind : "other";
 }
 
+const SIGN_IN = "gh auth login --hostname github.com --git-protocol https --web --clipboard";
+
 export function setupCommand(error: unknown): string | undefined {
   switch (errorKind(error)) {
     case "missing":
-      return "brew install gh && gh auth login";
+      return `brew install gh && ${SIGN_IN}`;
     case "unauthenticated":
-      return "gh auth login";
+    case "expired":
+      return SIGN_IN;
+    case "sso":
+      return "gh auth refresh --hostname github.com";
     case "not-found":
       return "gh auth status";
     default:
       return undefined;
   }
+}
+
+export function needsSignIn(error: unknown): boolean {
+  return ["missing", "unauthenticated", "expired", "sso"].includes(errorKind(error));
 }

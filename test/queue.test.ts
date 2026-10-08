@@ -125,9 +125,17 @@ describe("parseRepository", () => {
 
 describe("setupCommand", () => {
   it("suggests installing gh when it's missing", () =>
-    expect(setupCommand(new GhError("nope", "missing"))).toBe("brew install gh && gh auth login"));
+    expect(setupCommand(new GhError("nope", "missing"))).toBe(
+      "brew install gh && gh auth login --hostname github.com --git-protocol https --web --clipboard",
+    ));
   it("suggests signing in when gh isn't", () =>
-    expect(setupCommand(new GhError("nope", "unauthenticated"))).toBe("gh auth login"));
+    expect(setupCommand(new GhError("nope", "unauthenticated"))).toBe(
+      "gh auth login --hostname github.com --git-protocol https --web --clipboard",
+    ));
+  it("signs in again when the sign-in expired", () =>
+    expect(setupCommand(new GhError("nope", "expired"))).toMatch(/^gh auth login /));
+  it("refreshes for single sign-on", () =>
+    expect(setupCommand(new GhError("nope", "sso"))).toBe("gh auth refresh --hostname github.com"));
   it("has nothing for other errors", () => expect(setupCommand(new Error("boom"))).toBeUndefined());
 });
 

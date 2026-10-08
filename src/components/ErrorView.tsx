@@ -1,12 +1,15 @@
-import { Action, ActionPanel, Form, Icon, List, openExtensionPreferences, useNavigation } from "@raycast/api";
+import { Action, ActionPanel, Form, Icon, Keyboard, List, openExtensionPreferences, useNavigation } from "@raycast/api";
 import { ReactElement } from "react";
 import { describeError, ErrorAdvice, MERGE_QUEUE_DOCS } from "../lib/errors";
 import { GhErrorKind } from "../lib/gh";
 import { RepoSelection } from "../lib/repos";
+import { runInTerminal } from "./terminal";
 
 const ICONS: Record<GhErrorKind, Icon> = {
   missing: Icon.Terminal,
   unauthenticated: Icon.Lock,
+  expired: Icon.Lock,
+  sso: Icon.Key,
   "not-found": Icon.QuestionMarkCircle,
   gone: Icon.Hourglass,
   "no-queue": Icon.Info,
@@ -34,13 +37,21 @@ export function ErrorEmptyView(props: {
       description={advice.description}
       actions={
         <ActionPanel>
+          {advice.url ? <Action.OpenInBrowser title="Authorize on GitHub" url={advice.url} /> : null}
           {advice.canSwitch ? props.switchAction : null}
           {advice.kind === "no-queue" ? props.branchAction : null}
+          {advice.command && advice.kind !== "not-found" ? (
+            <Action
+              title={advice.kind === "missing" ? "Install GitHub CLI in Terminal" : "Open Terminal to Sign in"}
+              icon={Icon.Terminal}
+              onAction={() => runInTerminal(advice.command as string)}
+            />
+          ) : null}
           {advice.command ? (
             <Action.CopyToClipboard
-              title={advice.kind === "not-found" ? "Copy Status Command" : "Copy Setup Command"}
+              title={advice.kind === "not-found" ? "Copy Status Command" : "Copy Command"}
               content={advice.command}
-              icon={Icon.Terminal}
+              shortcut={Keyboard.Shortcut.Common.Copy}
             />
           ) : null}
           {props.onRetry ? <Action title="Try Again" icon={Icon.ArrowClockwise} onAction={props.onRetry} /> : null}

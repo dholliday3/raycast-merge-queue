@@ -8,10 +8,11 @@ export type ErrorAdvice = {
   title: string;
   description: string;
   command?: string;
+  url?: string;
   canSwitch: boolean;
 };
 
-function details(error: unknown): { repo?: string; branch?: string } {
+function details(error: unknown): { repo?: string; branch?: string; url?: string } {
   return error instanceof GhError ? error.details : {};
 }
 
@@ -21,7 +22,7 @@ function message(error: unknown): string {
 
 export function describeError(error: unknown): ErrorAdvice {
   const kind = errorKind(error);
-  const { repo, branch } = details(error);
+  const { repo, branch, url } = details(error);
   const command = setupCommand(error);
   switch (kind) {
     case "missing":
@@ -31,15 +32,36 @@ export function describeError(error: unknown): ErrorAdvice {
         canSwitch: false,
         title: "GitHub CLI isn't installed",
         description:
-          "Merge Queue reads GitHub through the gh command. Copy the setup command (↵), run it in a terminal, then come back.",
+          "Merge Queue reads GitHub through the gh command. Install it and sign in from Terminal (↵), then come back. It retries on its own.",
       };
     case "unauthenticated":
       return {
         kind,
         command,
         canSwitch: false,
-        title: "GitHub CLI isn't signed in",
-        description: "Copy the sign-in command (↵), run it in a terminal, then come back.",
+        title: "Sign in to the GitHub CLI",
+        description:
+          "gh isn't signed in. Sign in from Terminal (↵): it copies a code and opens GitHub in your browser. Merge Queue retries on its own.",
+      };
+    case "expired":
+      return {
+        kind,
+        command,
+        canSwitch: false,
+        title: "GitHub CLI sign-in expired",
+        description:
+          "GitHub no longer accepts gh's token; it expired or was revoked. Sign in again from Terminal (↵). Merge Queue retries on its own.",
+      };
+    case "sso":
+      return {
+        kind,
+        command,
+        url,
+        canSwitch: false,
+        title: repo ? `Authorize gh for ${repo.split("/")[0]}'s single sign-on` : "Authorize gh for single sign-on",
+        description: url
+          ? "This organization uses SAML single sign-on, and gh's token isn't authorized for it yet. Authorize it on GitHub (↵), then come back."
+          : "This organization uses SAML single sign-on, and gh's token isn't authorized for it yet. Refresh gh's sign-in from Terminal (↵) and authorize the organization in your browser.",
       };
     case "not-found":
       return {
@@ -48,7 +70,7 @@ export function describeError(error: unknown): ErrorAdvice {
         canSwitch: true,
         title: repo ? `Can't see ${repo}` : "Not found on GitHub",
         description:
-          "It doesn't exist, or the account gh is signed in to can't see it. Run gh auth status to check which account that is.",
+          "It doesn't exist, or the account gh is signed in to can't see it. gh auth status shows which account that is, and gh auth switch changes it.",
       };
     case "no-queue":
       return {

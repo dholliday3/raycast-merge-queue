@@ -14,6 +14,7 @@ import { checkIcon, entryIcon, entryStatusText } from "./components/presentation
 import { MergeQueueLaunchContext, requestRerunFailed, useMergeQueue, useSelection } from "./data";
 import { formatAgo, formatSeconds, truncate } from "./lib/format";
 import { errorIcon } from "./components/ErrorView";
+import { runInTerminal } from "./components/terminal";
 import { describeError } from "./lib/errors";
 import { failingRunIds, Health, QueueEntry, QueueSnapshot } from "./lib/queue";
 
@@ -159,11 +160,25 @@ export default function Command() {
               onAction={() => openInRaycast({ view: "repositories" })}
             />
           ) : null}
+          {advice.url ? (
+            <MenuBarExtra.Item
+              title="Authorize on GitHub"
+              icon={Icon.Key}
+              onAction={() => open(advice.url as string)}
+            />
+          ) : null}
+          {advice.command && advice.kind !== "not-found" ? (
+            <MenuBarExtra.Item
+              title={advice.kind === "missing" ? "Install GitHub CLI in Terminal" : "Open Terminal to Sign in"}
+              icon={Icon.Terminal}
+              onAction={() => runInTerminal(advice.command as string)}
+            />
+          ) : null}
           {advice.command ? (
             <MenuBarExtra.Item
-              title={advice.kind === "not-found" ? "Copy Status Command" : "Copy Setup Command"}
+              title={advice.kind === "not-found" ? "Copy Status Command" : "Copy Command"}
               subtitle={advice.command}
-              icon={Icon.Terminal}
+              icon={Icon.Clipboard}
               onAction={async () => {
                 await Clipboard.copy(advice.command as string);
                 await showHUD("Copied. Run it in a terminal.");

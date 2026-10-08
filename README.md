@@ -26,6 +26,8 @@ Optional checks that fail are shown in orange and don't count against the entry.
 
 Install and sign in to the [GitHub CLI](https://cli.github.com): `brew install gh && gh auth login`. That's all; there's nothing to fill in.
 
+If `gh` isn't installed, isn't signed in, its sign-in expired, or your organization's single sign-on hasn't authorized it, the extension says which and offers to fix it: `↵` opens Terminal with the right `gh` command, or GitHub's authorization page for single sign-on. It retries every few seconds, so it picks up as soon as you're done.
+
 ## Choosing a Repository
 
 Most people watch one queue, so the extension remembers yours and opens straight to it. The first time, if you have a pull request queued in exactly one repository, or only one of your repositories has a merge queue, it picks that one for you. Otherwise it lists repositories to choose from:

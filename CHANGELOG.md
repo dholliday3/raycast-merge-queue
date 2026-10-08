@@ -13,4 +13,5 @@
 - Pick a repository in the command: your queued pull requests' repositories and your active ones with a merge queue come first, or search all of GitHub by recent pushes, stars, or best match
 - Detects the queue's branch from the default branch, rulesets, or your queued pull requests
 - Reads through the GitHub CLI, with nothing to configure
+- Signing in to gh from Raycast: when gh isn't installed, isn't signed in, has an expired sign-in, or needs single sign-on authorized for an organization, one action opens Terminal with the right command (or GitHub's authorization page), and the extension retries every few seconds until it works
 - Plain-language errors with a fix for each: install or sign in to gh, a repository you can't see, one without a merge queue (choose another or enter its branch), offline, and rate limits

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { selectionFor, useRepoChoices, useRepoSearch } from "../data";
 import { formatAgo } from "../lib/format";
 import { MERGE_QUEUE_DOCS } from "../lib/errors";
+import { needsSignIn } from "../lib/gh";
 import { ErrorEmptyView } from "./ErrorView";
 import { groupChoices, obviousChoice, parseTypedRepo, RepoChoice, RepoSelection, RepoSort } from "../lib/repos";
 
@@ -103,6 +104,15 @@ export function RepoPicker(props: {
   const typed = parseTypedRepo(text);
   const error = searching ? search.error : choices.error;
   const autoPicked = useRef(false);
+  const waitingForSignIn = needsSignIn(choices.error);
+
+  useEffect(() => {
+    if (!waitingForSignIn) {
+      return;
+    }
+    const timer = setInterval(choices.revalidate, 5_000);
+    return () => clearInterval(timer);
+  }, [waitingForSignIn, choices.revalidate]);
 
   useEffect(() => {
     if (!props.autoPick || autoPicked.current || text || choices.isLoading || !choices.data) {

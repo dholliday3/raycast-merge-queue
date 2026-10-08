@@ -1,13 +1,14 @@
 import { Cache, getPreferenceValues, LocalStorage } from "@raycast/api";
 import { useCachedPromise, useLocalStorage } from "@raycast/utils";
 import { demoAnnotations, demoChoices, DEMO_REPO, DEMO_REQUIRED_CHECKS, demoJob, demoLog, demoQueue } from "./lib/demo";
-import { findGh, GhError, RepoConfig, repoSlug } from "./lib/gh";
+import { findGh, GhError, GhErrorKind, RepoConfig, repoSlug } from "./lib/gh";
 import { Annotation, fetchAnnotations, fetchJob, fetchJobLog, rerunFailedJobs, rerunJob } from "./lib/jobs";
 import { StepRef, summarizeLog } from "./lib/logs";
 import { fetchQueue, fetchRequiredChecks, parseQueue, QueueSnapshot } from "./lib/queue";
 import { fetchRepoChoices, rememberRecent, RepoChoice, RepoSelection, RepoSort, searchRepoChoices } from "./lib/repos";
 
 export type MergeQueueLaunchContext = {
+  demoError?: GhErrorKind;
   prNumber?: number;
   check?: string;
   view?: "checks" | "job" | "repositories";
@@ -23,9 +24,11 @@ const REQUIRED_CHECKS_TTL_MS = 60 * 60 * 1000;
 const cache = new Cache();
 
 let demo = false;
+let demoError: GhErrorKind | undefined;
 
-export function enableDemo(enabled: boolean | undefined) {
+export function enableDemo(enabled: boolean | undefined, error?: GhErrorKind) {
   demo = demo || Boolean(enabled);
+  demoError = demoError ?? error;
 }
 
 export function isDemo(): boolean {
@@ -93,6 +96,9 @@ async function requiredChecks(config: RepoConfig, branch: string): Promise<strin
 }
 
 async function loadQueue(useDemo: boolean, owner: string, name: string, branch?: string): Promise<QueueSnapshot> {
+  if (useDemo && demoError) {
+    throw new GhError(`Demo ${demoError} error`, demoError, { repo: "acme/storefront", branch: "main" });
+  }
   if (useDemo) {
     return parseQueue(DEMO_REPO, demoQueue(), DEMO_REQUIRED_CHECKS);
   }
