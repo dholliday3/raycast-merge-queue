@@ -1,6 +1,6 @@
 import { Color, Detail, List } from "@raycast/api";
 import { useCachedPromise } from "@raycast/utils";
-import { loadJob, loadLogSummary } from "../data";
+import { loadJob, loadLogSummary, LogJob } from "../data";
 import { logErrorMessage } from "../lib/errors";
 import { formatSeconds, secondsBetween } from "../lib/format";
 import { jobState } from "../lib/jobs";
@@ -42,10 +42,17 @@ export function useJobReport(props: {
   const finished = job?.status === "completed";
   const step = failedStep(job);
   const stepRef = step ? { name: step.name, startedAt: step.startedAt } : undefined;
-  const log = useCachedPromise(loadLogSummary, [jobId, stepRef], {
-    execute: props.enabled && props.wantLog && finished,
-    keepPreviousData: true,
-  });
+  const logJob: LogJob = {
+    id: jobId,
+    runId: job?.runId ?? 0,
+    name: job?.name ?? props.check.name,
+    workflowName: job?.workflowName,
+    headSha: job?.headSha,
+  };
+  const logOptions = { execute: props.enabled && props.wantLog && finished, keepPreviousData: true };
+  const quickLog = useCachedPromise(loadLogSummary, [logJob, stepRef, false], logOptions);
+  const comparedLog = useCachedPromise(loadLogSummary, [logJob, stepRef, true], logOptions);
+  const log = { data: comparedLog.data ?? quickLog.data, error: comparedLog.data ? undefined : quickLog.error };
 
   let logState: LogState;
   const logEnabled = props.enabled && props.wantLog;
@@ -76,12 +83,13 @@ export function useJobReport(props: {
   return {
     input,
     job,
-    isLoading: details.isLoading || log.isLoading,
+    isLoading: details.isLoading || quickLog.isLoading || comparedLog.isLoading,
     failureUrl: failureUrl(job, logState, check.url),
     revalidate: () => {
       details.revalidate();
       if (props.wantLog && finished) {
-        log.revalidate();
+        quickLog.revalidate();
+        comparedLog.revalidate();
       }
     },
   };

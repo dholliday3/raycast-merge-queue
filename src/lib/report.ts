@@ -1,6 +1,6 @@
 import { formatSeconds, secondsBetween } from "./format";
 import { Annotation, Job, JobStep } from "./jobs";
-import { excerptAround, LogSummary } from "./logs";
+import { excerptAround, FoundError, LogSummary } from "./logs";
 import { Check } from "./queue";
 
 export type LogState =
@@ -42,14 +42,31 @@ function loadedSummary(log: LogState): LogSummary | undefined {
   return log.status === "loaded" ? log.summary : undefined;
 }
 
+function blobUrl(input: Pick<JobReportInput, "repo" | "sha">, path: string, line?: number): string | undefined {
+  return input.repo && input.sha
+    ? `https://github.com/${input.repo}/blob/${input.sha}/${path}${line ? `#L${line}` : ""}`
+    : undefined;
+}
+
+function fromLog(error: FoundError, input: Pick<JobReportInput, "repo" | "sha">): FailureError {
+  if (!error.path || !error.inRepo) {
+    return { text: error.text };
+  }
+  return {
+    text: error.message,
+    location: `${error.path}${error.line ? `:${error.line}` : ""}`,
+    url: blobUrl(input, error.path, error.line),
+  };
+}
+
 export function failureErrors(input: Pick<JobReportInput, "annotations" | "log" | "repo" | "sha">): FailureError[] {
   const errors: FailureError[] = [];
-  const seen = new Set<string>();
+  const seen: string[] = [];
   const add = (error: FailureError) => {
     const text = error.text.replace(/\s+/g, " ").trim();
-    const key = `${error.location ?? ""} ${text}`;
-    if (text && !/^Process completed with exit code/.test(text) && ![...seen].some((other) => other.includes(text))) {
-      seen.add(key);
+    const duplicate = seen.some((other) => other.includes(text) || (text.length >= 20 && text.includes(other)));
+    if (text && !/^Process completed with exit code/.test(text) && !duplicate) {
+      seen.push(text);
       errors.push({ ...error, text });
     }
   };
@@ -59,15 +76,18 @@ export function failureErrors(input: Pick<JobReportInput, "annotations" | "log" 
     }
     const hasFile = Boolean(annotation.path) && annotation.path !== ".github";
     const location = hasFile ? `${annotation.path}${annotation.line ? `:${annotation.line}` : ""}` : undefined;
-    const url =
-      hasFile && input.repo && input.sha
-        ? `https://github.com/${input.repo}/blob/${input.sha}/${annotation.path}${annotation.line ? `#L${annotation.line}` : ""}`
-        : undefined;
+    const url = hasFile ? blobUrl(input, annotation.path, annotation.line) : undefined;
     const title = annotation.title && !location ? `${annotation.title}: ` : "";
     add({ text: `${title}${annotation.message}`, location, url });
   }
-  for (const error of loadedSummary(input.log)?.errors ?? []) {
-    add({ text: error });
+  const logErrors = loadedSummary(input.log)?.errors ?? [];
+  for (const error of logErrors.filter((error) => error.fromRunner)) {
+    add(fromLog(error, input));
+  }
+  if (errors.length === 0) {
+    for (const error of logErrors.filter((error) => !error.fromRunner)) {
+      add(fromLog(error, input));
+    }
   }
   return errors.slice(0, MAX_ERRORS);
 }

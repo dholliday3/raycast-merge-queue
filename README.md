@@ -18,6 +18,8 @@ Optional checks that fail are shown in orange and don't count against the entry.
 
 `↵` on an entry opens its checks in two columns, built for debugging. The left column lists every check, failed first, then running, then finished. The right column previews the selected failure: errors with links to the file and line at the queued commit, failed and flaky tests, and the part of the log around the error. Below that, **Failure** links to the exact log line on GitHub (`⌘↵` opens it), with the run, duration and pull request. `↵` opens the full report, and `⇧⌘C` copies a summary with the link to paste into chat.
 
+Errors come from GitHub's annotations when a tool reports them. When it doesn't, the extension finds them in the log without knowing the tool: it looks only at the failed step, scores each line for signs of failure (`error:`, `FAIL`, `panic:`, tracebacks, assertion diffs) and skips build-tool wrap-up and warnings. It then compares the log with the last passing run of the same job and sets aside every line both runs printed, so a failure with no error wording still stands out and shared output collapses to `⋯ N lines also in the last passing run`. File paths are linked only after GitHub confirms the file exists at that commit. Failed test names are read for Jest, Vitest, Playwright, pytest, Go, RSpec, Cargo, Gradle and .NET.
+
 ![Checks](metadata/merge-queue-2.png)
 
 **Merge Queue Menu Bar** shows your position (`#3 · 14m`) with an icon for your worst entry's state, refreshing every minute. Each entry has a submenu with its failing checks and a rerun action.
@@ -40,7 +42,7 @@ To switch, use the **Repository** section of the dropdown next to the search bar
 
 A queue is detected on the default branch, on a branch named in a ruleset with a merge queue rule, or on the base branch of your queued pull requests. **GitHub CLI Path** is found automatically in `/opt/homebrew/bin`, `/usr/local/bin` or `/usr/bin`; set it in preferences if `gh` lives somewhere else.
 
-The extension reads through `gh`, so it sees exactly what your `gh` account can see. Each refresh is one GraphQL query. Required checks come from the branch's rulesets and branch protection (read access is enough) and are cached for an hour. Job logs are only fetched when you open a failed job, or press `⌘L` on another one.
+The extension reads through `gh`, so it sees exactly what your `gh` account can see. Each refresh is one GraphQL query. Required checks come from the branch's rulesets and branch protection (read access is enough) and are cached for an hour. Job logs are only fetched when you open a failed job, or press `⌘L` on another one. Comparing with a passing run costs one more log download and three small API calls the first time a job fails; the result is cached for six hours per workflow and job.
 
 ## Shortcuts
 

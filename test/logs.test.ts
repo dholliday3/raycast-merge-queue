@@ -30,7 +30,8 @@ describe("summarizeLog with Playwright", () => {
     expect(summary.excerpt.some((line) => /^\d{4}-\d{2}-\d{2}T/.test(line))).toBe(false);
   });
 
-  it("ignores the exit code line as an error", () => expect(summary.errors).toEqual([]));
+  it("ignores the exit code line as an error", () =>
+    expect(summary.errors.some((error) => /exit code/.test(error.text))).toBe(false));
 });
 
 describe("summarizeLog with Vitest", () => {
@@ -62,7 +63,15 @@ describe("summarizeLog with plain errors", () => {
       ts("##[error]Process completed with exit code 2."),
     ].join("\n");
     const summary = summarizeLog(log);
-    expect(summary.errors).toEqual(["src/a.ts(3,1): error TS2304: Cannot find name 'x'."]);
+    expect(summary.errors.filter((error) => error.fromRunner)).toEqual([
+      {
+        text: "src/a.ts(3,1): error TS2304: Cannot find name 'x'.",
+        message: "error TS2304: Cannot find name 'x'.",
+        path: "src/a.ts",
+        line: 3,
+        fromRunner: true,
+      },
+    ]);
     expect(summary.excerpt).toContain("src/a.ts(3,1): error TS2304");
   });
 });
@@ -129,7 +138,7 @@ describe("failureLineInStep, GitHub's line numbers inside a step", () => {
 
 describe("job report", () => {
   const job = demoJob(DEMO_FAILING_JOB_ID, new Date("2026-10-07T14:30:00Z"));
-  const summary = summarizeLog(DEMO_LOG, { name: "Run Playwright" });
+  const summary = summarizeLog(DEMO_LOG, { step: { name: "Run Playwright" } });
   const check = { name: "e2e (chromium)", state: "failure" as const, required: true, jobId: 9100, runId: 16100 };
   const input = {
     check,
@@ -193,7 +202,7 @@ describe("job report", () => {
 
   it("gives each demo check its own job, so a passing one never shows a failure", () => {
     expect(failedStep(demoJob(9103))?.name).toBe("Audit dependencies");
-    expect(summarizeLog(demoLog(9103)).errors).toEqual([
+    expect(summarizeLog(demoLog(9103)).errors.map((error) => error.text)).toEqual([
       "npm audit found 1 high severity vulnerability (image-size <1.2.1)",
     ]);
     expect(demoJob(9003).conclusion).toBe("success");

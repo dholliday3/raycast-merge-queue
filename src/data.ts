@@ -2,8 +2,18 @@ import { Cache, getPreferenceValues, LocalStorage } from "@raycast/api";
 import { useCachedPromise, useLocalStorage } from "@raycast/utils";
 import { demoAnnotations, demoChoices, DEMO_REPO, DEMO_REQUIRED_CHECKS, demoJob, demoLog, demoQueue } from "./lib/demo";
 import { findGh, GhError, GhErrorKind, RepoConfig, repoSlug } from "./lib/gh";
-import { Annotation, fetchAnnotations, fetchJob, fetchJobLog, rerunFailedJobs, rerunJob } from "./lib/jobs";
-import { StepRef, summarizeLog } from "./lib/logs";
+import {
+  Annotation,
+  fetchAnnotations,
+  fetchJob,
+  fetchJobLog,
+  filesInRepo,
+  findPassingJob,
+  Job,
+  rerunFailedJobs,
+  rerunJob,
+} from "./lib/jobs";
+import { LogSummary, logFingerprints, StepRef, summarizeLog } from "./lib/logs";
 import { fetchQueue, fetchRequiredChecks, parseQueue, QueueSnapshot } from "./lib/queue";
 import { fetchRepoChoices, rememberRecent, RepoChoice, RepoSelection, RepoSort, searchRepoChoices } from "./lib/repos";
 
@@ -16,11 +26,19 @@ export type MergeQueueLaunchContext = {
 };
 
 type CachedRequiredChecks = { fetchedAt: number; checks: string[] };
+type CachedPassingRun = { fetchedAt: number; fingerprints: string[] | null };
+
+export type LogJob = Pick<Job, "id" | "runId" | "name" | "workflowName" | "headSha">;
 
 const SELECTION_KEY = "repository";
 const RECENTS_KEY = "recent-repositories";
 const DEMO_RECENTS: RepoSelection[] = [DEMO_REPO, { owner: "acme", name: "payments", branch: "main" }];
 const REQUIRED_CHECKS_TTL_MS = 60 * 60 * 1000;
+const PASSING_RUN_TTL_MS = 6 * 60 * 60 * 1000;
+const NO_PASSING_RUN_TTL_MS = 60 * 60 * 1000;
+const PASSING_RUN_TIMEOUT_MS = 20_000;
+const LOGS_KEPT_IN_MEMORY = 4;
+const logDownloads = new Map<number, Promise<string>>();
 const cache = new Cache();
 
 let demo = false;
@@ -147,8 +165,62 @@ export async function loadJob(jobId: number) {
   return { job, annotations };
 }
 
-export async function loadLogSummary(jobId: number, step?: StepRef) {
-  return summarizeLog(demo ? demoLog(jobId) : await fetchJobLog(await getConfig(), jobId), step);
+async function passingFingerprints(config: RepoConfig, job: LogJob): Promise<Set<string> | undefined> {
+  const key = `passing-run:${repoSlug(config)}:${job.workflowName ?? job.runId}:${job.name}`;
+  const raw = cache.get(key);
+  const cached = raw ? (JSON.parse(raw) as CachedPassingRun) : undefined;
+  const ttl = cached?.fingerprints ? PASSING_RUN_TTL_MS : NO_PASSING_RUN_TTL_MS;
+  if (cached && Date.now() - cached.fetchedAt < ttl) {
+    return cached.fingerprints ? new Set(cached.fingerprints) : undefined;
+  }
+  const passing = await findPassingJob(config, job);
+  const fingerprints = passing ? logFingerprints(await fetchJobLog(config, passing.jobId)) : null;
+  cache.set(key, JSON.stringify({ fetchedAt: Date.now(), fingerprints } satisfies CachedPassingRun));
+  return fingerprints ? new Set(fingerprints) : undefined;
+}
+
+function withinTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  return Promise.race([promise, new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms))]);
+}
+
+async function markFilesInRepo(config: RepoConfig, sha: string | undefined, summary: LogSummary): Promise<LogSummary> {
+  const paths = summary.errors.flatMap((error) => (error.path ? [error.path] : []));
+  if (!sha || paths.length === 0) {
+    return summary;
+  }
+  const existing = await filesInRepo(config, sha, paths).catch(() => new Set<string>());
+  return {
+    ...summary,
+    errors: summary.errors.map((error) => ({ ...error, inRepo: Boolean(error.path && existing.has(error.path)) })),
+  };
+}
+
+function downloadLog(config: RepoConfig, jobId: number): Promise<string> {
+  const existing = logDownloads.get(jobId);
+  if (existing) {
+    return existing;
+  }
+  const download = fetchJobLog(config, jobId);
+  download.catch(() => logDownloads.delete(jobId));
+  logDownloads.set(jobId, download);
+  while (logDownloads.size > LOGS_KEPT_IN_MEMORY) {
+    logDownloads.delete(logDownloads.keys().next().value!);
+  }
+  return download;
+}
+
+export async function loadLogSummary(job: LogJob, step: StepRef | undefined, compare: boolean): Promise<LogSummary> {
+  if (demo) {
+    return summarizeLog(demoLog(job.id), { step });
+  }
+  const config = await getConfig();
+  const [raw, passing] = await Promise.all([
+    downloadLog(config, job.id),
+    compare
+      ? withinTimeout(passingFingerprints(config, job), PASSING_RUN_TIMEOUT_MS).catch(() => undefined)
+      : undefined,
+  ]);
+  return markFilesInRepo(config, job.headSha, summarizeLog(raw, { step, passing }));
 }
 
 export async function requestRerunFailed(runIds: number[]) {
