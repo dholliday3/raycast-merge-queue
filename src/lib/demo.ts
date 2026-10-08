@@ -21,7 +21,6 @@ export const DEMO_REQUIRED_CHECKS = ["build", "lint", "typecheck", "unit tests",
 export const DEMO_FAILING_JOB_ID = 9100;
 const DEMO_FAILURE_IDS: Record<string, number> = {
   "e2e (chromium)": 9100,
-  lighthouse: 9101,
   "bundle size": 9102,
   "security audit": 9103,
 };
@@ -119,12 +118,21 @@ export function demoQueue(now = new Date()): QueueResponse {
           nodes: [
             entry(now, {
               position: 1,
-              number: 4812,
-              title: "Bump the checkout SDK to 3.2",
-              author: "mira",
-              state: "LOCKED",
+              number: 4815,
+              title: "Fix currency rounding on partial refunds",
+              author: "jonah",
+              state: "AWAITING_CHECKS",
               enqueuedMinutesAgo: 41,
-              checks: suite(now, { lighthouse: "running", "security audit": "failure" }, 30),
+              checks: suite(
+                now,
+                {
+                  "e2e (chromium)": "failure",
+                  "security audit": "failure",
+                  lighthouse: "running",
+                  "e2e (webkit)": "skipped",
+                },
+                20,
+              ),
             }),
             entry(now, {
               position: 2,
@@ -142,12 +150,12 @@ export function demoQueue(now = new Date()): QueueResponse {
             }),
             entry(now, {
               position: 3,
-              number: 4815,
-              title: "Fix currency rounding on partial refunds",
-              author: "jonah",
-              state: "UNMERGEABLE",
+              number: 4812,
+              title: "Bump the checkout SDK to 3.2",
+              author: "mira",
+              state: "MERGEABLE",
               enqueuedMinutesAgo: 22,
-              checks: suite(now, { "e2e (chromium)": "failure", lighthouse: "failure" }, 20),
+              checks: suite(now, {}, 30),
             }),
             entry(now, {
               position: 4,
@@ -208,17 +216,6 @@ const DEMO_JOBS: Record<number, { name: string; workflow: string; steps: DemoSte
       ["Run Playwright", "failure", 16, 6],
       ["Upload report", "success", 6, 6],
       ["Complete job", "success", 6, 6],
-    ],
-  },
-  9101: {
-    name: "lighthouse",
-    workflow: "Quality",
-    steps: [
-      ["Set up job", "success", 20, 20],
-      ["Check out code", "success", 20, 19],
-      ["Build", "success", 19, 15],
-      ["Run Lighthouse", "failure", 15, 12],
-      ["Complete job", "success", 12, 12],
     ],
   },
   9102: {
@@ -350,24 +347,6 @@ export const DEMO_LOG = [
 ].join("\n");
 
 const DEMO_OTHER_LOGS: Record<number, string[]> = {
-  9101: [
-    "##[group]Run npx lhci autorun",
-    "npx lhci autorun",
-    "##[endgroup]",
-    "✅  .lighthouseci/ directory writable",
-    "Running Lighthouse 3 time(s) on http://localhost:4173/checkout",
-    "Checking assertions against 1 URL(s), 3 run(s)",
-    "",
-    "  1 result(s) for http://localhost:4173/checkout :",
-    "",
-    "  ✘  categories.performance failure for minScore assertion",
-    "       expected: >=0.85",
-    "          found: 0.81",
-    "     all values: 0.81, 0.79, 0.82",
-    "",
-    "##[error]Assertion failed: categories.performance 0.81 is below the 0.85 budget",
-    "##[error]Process completed with exit code 1.",
-  ],
   9102: [
     "##[group]Run npx size-limit",
     "npx size-limit",

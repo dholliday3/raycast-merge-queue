@@ -23,9 +23,9 @@ describe("parseQueue", () => {
 
   it("reads each entry's health", () => {
     expect(snapshot().entries.map((entry) => [entry.pr.number, entry.health])).toEqual([
-      [4812, "merging"],
-      [4807, "running"],
       [4815, "failing"],
+      [4807, "running"],
+      [4812, "passing"],
       [4820, "running"],
       [4822, "conflict"],
       [4825, "queued"],
@@ -35,7 +35,7 @@ describe("parseQueue", () => {
   it("splits failures into required and optional", () => {
     const entry = byNumber(4815);
     expect(entry.failingRequired.map((check) => check.name)).toEqual(["e2e (chromium)"]);
-    expect(entry.failingOptional.map((check) => check.name)).toEqual(["lighthouse"]);
+    expect(entry.failingOptional.map((check) => check.name)).toEqual(["security audit"]);
   });
 
   it("keeps an optional failure from failing the entry", () => {
@@ -54,7 +54,7 @@ describe("parseQueue", () => {
       byNumber(4815)
         .checks.map((check) => check.name)
         .slice(0, 3),
-    ).toEqual(["e2e (chromium)", "lighthouse", "build"]);
+    ).toEqual(["e2e (chromium)", "security audit", "lighthouse"]);
     expect(byNumber(4807).checks.map((check) => check.name)).toEqual([
       "migrations",
       "e2e (chromium)",
@@ -91,14 +91,16 @@ describe("parseQueue", () => {
 });
 
 describe("demo's first entry", () => {
-  it("is merging with an optional check failing and another running", () => {
-    const entry = byNumber(4812);
-    expect(entry.health).toBe("merging");
-    expect(entry.failingOptional.map((check) => check.name)).toEqual(["security audit"]);
-    expect(entry.checks.slice(0, 2).map((check) => [check.name, check.state])).toEqual([
-      ["security audit", "failure"],
-      ["lighthouse", "pending"],
+  it("covers every check state", () => {
+    const entry = snapshot().entries[0];
+    expect([entry.pr.number, entry.health]).toEqual([4815, "failing"]);
+    expect(entry.checks.slice(0, 4).map((check) => [check.name, check.state, check.required])).toEqual([
+      ["e2e (chromium)", "failure", true],
+      ["security audit", "failure", false],
+      ["lighthouse", "pending", false],
+      ["build", "success", true],
     ]);
+    expect(entry.checks.find((check) => check.name === "e2e (webkit)")?.state).toBe("skipped");
   });
 });
 

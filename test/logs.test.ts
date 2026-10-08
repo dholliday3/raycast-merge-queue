@@ -192,9 +192,9 @@ describe("job report", () => {
   });
 
   it("gives each demo check its own job, so a passing one never shows a failure", () => {
-    expect(failedStep(demoJob(9101))?.name).toBe("Run Lighthouse");
-    expect(summarizeLog(demoLog(9101)).errors).toEqual([
-      "Assertion failed: categories.performance 0.81 is below the 0.85 budget",
+    expect(failedStep(demoJob(9103))?.name).toBe("Audit dependencies");
+    expect(summarizeLog(demoLog(9103)).errors).toEqual([
+      "npm audit found 1 high severity vulnerability (image-size <1.2.1)",
     ]);
     expect(demoJob(9003).conclusion).toBe("success");
     expect(failedStep(demoJob(9003))).toBeUndefined();
