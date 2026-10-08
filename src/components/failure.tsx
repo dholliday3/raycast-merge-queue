@@ -44,6 +44,7 @@ export function useJobReport(props: {
   const stepRef = step ? { name: step.name, startedAt: step.startedAt } : undefined;
   const log = useCachedPromise(loadLogSummary, [jobId, stepRef], {
     execute: props.enabled && props.wantLog && finished,
+    keepPreviousData: true,
   });
 
   let logState: LogState;
@@ -86,7 +87,11 @@ export function useJobReport(props: {
   };
 }
 
-export function metadataRows(input: JobReportInput, url: string | undefined): MetadataRow[] {
+export function metadataRows(
+  input: JobReportInput,
+  url: string | undefined,
+  options: { compact?: boolean } = {},
+): MetadataRow[] {
   const { check, job, pr } = input;
   const rows: MetadataRow[] = [
     {
@@ -112,13 +117,13 @@ export function metadataRows(input: JobReportInput, url: string | undefined): Me
   const seconds = job
     ? secondsBetween(job.startedAt, job.completedAt ?? new Date())
     : secondsBetween(check.startedAt, check.completedAt ?? (check.state === "pending" ? new Date() : undefined));
-  if (seconds !== undefined) {
+  if (seconds !== undefined && !options.compact) {
     rows.push({ kind: "label", title: "Duration", text: formatSeconds(seconds) });
   }
   if (job) {
     rows.push({ kind: "link", title: "Run", text: `Attempt ${job.runAttempt}`, target: job.runUrl });
   }
-  if (pr) {
+  if (pr && !options.compact) {
     rows.push({ kind: "separator" }, { kind: "link", title: "Pull Request", text: `#${pr.number}`, target: pr.url });
   }
   return rows;

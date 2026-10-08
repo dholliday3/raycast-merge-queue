@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatSeconds, ordinal, secondsBetween, truncate } from "../src/lib/format";
+import { formatAgo, formatSeconds, ordinal, secondsBetween, truncate } from "../src/lib/format";
 
 describe("format", () => {
   it("formats durations", () => {
@@ -16,4 +16,14 @@ describe("format", () => {
     expect(secondsBetween("2026-10-07T14:00:00Z", "2026-10-07T14:01:30Z")).toBe(90));
   it("is undefined without a start", () => expect(secondsBetween(undefined)).toBeUndefined());
   it("truncates with an ellipsis", () => expect(truncate("abcdef", 4)).toBe("abc…"));
+  it("says how long ago in the largest whole unit", () => {
+    const now = new Date("2026-10-07T12:00:00Z");
+    const ago = (seconds: number) => formatAgo(new Date(now.getTime() - seconds * 1000).toISOString(), now);
+    expect([ago(20), ago(14 * 60), ago(10 * 3600 + 41 * 60), ago(63 * 3600)]).toEqual([
+      "just now",
+      "14m ago",
+      "10h ago",
+      "2d ago",
+    ]);
+  });
 });

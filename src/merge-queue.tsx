@@ -1,5 +1,5 @@
 import { Action, ActionPanel, Icon, Keyboard, LaunchProps, List, useNavigation } from "@raycast/api";
-import { ReactElement, useEffect, useState } from "react";
+import { ReactElement, useEffect, useRef, useState } from "react";
 import { ChecksList } from "./components/ChecksList";
 import { EnterBranch, ErrorEmptyView } from "./components/ErrorView";
 import { JobDetail } from "./components/JobDetail";
@@ -143,6 +143,7 @@ function EntryItem(props: {
 
 export default function Command(props: LaunchProps<{ launchContext: MergeQueueLaunchContext }>) {
   enableDemo(props.launchContext?.demo);
+  const context = props.launchContext;
   const { selection, recents, setSelection, isLoading: selectionLoading } = useSelection();
   const cachedChoices = useRepoChoices({ execute: false });
   const { push } = useNavigation();
@@ -151,26 +152,19 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
   const { error, isLoading, revalidate } = queue;
   const data = isSnapshotOf(queue.data, selection) ? queue.data : undefined;
   const [filter, setFilter] = useState<Filter>("all");
-  const [selectedId, setSelectedId] = useState<string>();
-  const context = props.launchContext;
+  const repoKey = selection ? selectionKey(selection) : "";
+  const initialSelection = useRef<{ repo: string; id?: string }>(undefined);
+  if (data && initialSelection.current?.repo !== repoKey) {
+    const target = context?.prNumber ?? data.entries.find((entry) => entry.isMine)?.pr.number;
+    initialSelection.current = { repo: repoKey, id: target === undefined ? undefined : String(target) };
+  }
+  const selectedId = initialSelection.current?.repo === repoKey ? initialSelection.current.id : undefined;
   const [choosing, setChoosing] = useState(context?.view === "repositories");
 
   useEffect(() => {
     const timer = setInterval(revalidate, POLL_MS);
     return () => clearInterval(timer);
   }, [revalidate]);
-
-  useEffect(() => {
-    if (selectedId || !data) {
-      return;
-    }
-    const target = context?.prNumber ?? data.entries.find((entry) => entry.isMine)?.pr.number;
-    if (target !== undefined) {
-      setSelectedId(String(target));
-    }
-  }, [data, selectedId, context?.prNumber]);
-
-  useEffect(() => setSelectedId(undefined), [selection?.owner, selection?.name, selection?.branch]);
 
   if (selectionLoading) {
     return <List isLoading />;
@@ -198,9 +192,23 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
   );
 
   const launchedEntry =
-    context?.view === "checks" ? data?.entries.find((entry) => entry.pr.number === context.prNumber) : undefined;
+    context?.view === "checks" || context?.view === "job"
+      ? data?.entries.find((entry) => entry.pr.number === context.prNumber)
+      : undefined;
+  const launchedJob =
+    context?.view === "job" ? launchedEntry?.checks.find((check) => check.name === context.check) : undefined;
+  if (launchedEntry && launchedJob?.jobId !== undefined) {
+    return (
+      <JobDetail
+        check={{ ...launchedJob, jobId: launchedJob.jobId }}
+        pr={launchedEntry.pr}
+        repo={data?.repo}
+        sha={launchedEntry.headSha}
+      />
+    );
+  }
   if (launchedEntry) {
-    return <ChecksList initialEntry={launchedEntry} />;
+    return <ChecksList initialEntry={launchedEntry} initialCheck={context?.check} />;
   }
 
   const entries = (data?.entries ?? []).filter((entry) => matchesFilter(entry, filter));
@@ -225,11 +233,6 @@ export default function Command(props: LaunchProps<{ launchContext: MergeQueueLa
       isLoading={isLoading || (!data && !error)}
       searchBarPlaceholder="Filter by title, number, author, or branch"
       selectedItemId={selectedId}
-      onSelectionChange={(id) => {
-        if (id) {
-          setSelectedId(id);
-        }
-      }}
       searchBarAccessory={
         <List.Dropdown
           key={dropdownKey}

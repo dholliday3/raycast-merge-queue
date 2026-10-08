@@ -145,7 +145,7 @@ describe("job report", () => {
     expect(failureErrors(input)[0]).toEqual({
       location: "e2e/refunds.spec.ts:48",
       url: "https://github.com/acme/storefront/blob/abc123/e2e/refunds.spec.ts#L48",
-      text: '[chromium] › refunds.spec.ts:31:3 › partial refund rounds to the cent: Expected "$12.35", received "$12.34"',
+      text: 'Expected "$12.35", received "$12.34"',
     }));
 
   it("reads key errors as location: message", () =>
@@ -185,9 +185,9 @@ describe("job report", () => {
       log: { status: "unavailable", reason: "running" },
     });
     expect(preview).toMatch(/^Running · .+ · step 4 of 6\n/);
-    expect(preview).toContain("- ✓ Install dependencies");
-    expect(preview).toContain("- ◐ **Run tests**");
-    expect(preview).toContain("- ○ Upload results");
+    expect(preview).toContain("✓ Install dependencies");
+    expect(preview).toContain("◐ **Run tests**");
+    expect(preview).toContain("○ Upload results");
     expect(failureUrl(job, { status: "idle" })).toBe(`${job.htmlUrl}#step:4:1`);
   });
 

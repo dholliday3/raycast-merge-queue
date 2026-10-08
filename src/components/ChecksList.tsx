@@ -32,7 +32,7 @@ function ViewSection(props: { entry: QueueEntry; view: ViewActions }) {
   );
 }
 
-function CheckItem(props: { check: Check; entry: QueueEntry; repo: string; view: ViewActions }) {
+function CheckItem(props: { check: Check; entry: QueueEntry; repo: string; view: ViewActions; id: string }) {
   const { check, entry, repo, view } = props;
   const failing = check.state === "failure";
   const report = useJobReport({
@@ -48,6 +48,7 @@ function CheckItem(props: { check: Check; entry: QueueEntry; repo: string; view:
 
   return (
     <List.Item
+      id={props.id}
       icon={{ value: checkIcon(check), tooltip: `${checkLabel(check)}${check.required ? "" : " · optional"}` }}
       title={check.name}
       keywords={check.workflow ? [check.workflow] : undefined}
@@ -55,7 +56,7 @@ function CheckItem(props: { check: Check; entry: QueueEntry; repo: string; view:
         <List.Item.Detail
           isLoading={report.isLoading}
           markdown={buildPreviewMarkdown(input)}
-          metadata={<ListMetadata rows={metadataRows(input, failureUrl)} />}
+          metadata={<ListMetadata rows={metadataRows(input, failureUrl, { compact: true })} />}
         />
       }
       actions={
@@ -111,7 +112,11 @@ function CheckItem(props: { check: Check; entry: QueueEntry; repo: string; view:
   );
 }
 
-export function ChecksList(props: { initialEntry: QueueEntry }) {
+function checkKey(check: Check): string {
+  return `${check.workflow ?? ""}/${check.name}/${check.jobId ?? ""}`;
+}
+
+export function ChecksList(props: { initialEntry: QueueEntry; initialCheck?: string }) {
   const { selection } = useSelection();
   const { data, isLoading, revalidate } = useMergeQueue(selection);
   const live = data?.entries.find((entry) => entry.pr.number === props.initialEntry.pr.number);
@@ -119,6 +124,8 @@ export function ChecksList(props: { initialEntry: QueueEntry }) {
   const leftQueue = Boolean(data) && !live;
   const repo = data?.repo ?? (selection ? `${selection.owner}/${selection.name}` : "");
   const view: ViewActions = { revalidate };
+  const initialCheck = entry.checks.find((check) => check.name === props.initialCheck);
+  const initialSelection = initialCheck ? checkKey(initialCheck) : undefined;
 
   useEffect(() => {
     const timer = setInterval(revalidate, POLL_MS);
@@ -136,6 +143,7 @@ export function ChecksList(props: { initialEntry: QueueEntry }) {
       isShowingDetail={entry.checks.length > 0}
       navigationTitle={`#${entry.pr.number} · ${truncate(entry.pr.title, 48)}${leftQueue ? " · left the queue" : ""}`}
       searchBarPlaceholder={`Filter ${entry.checks.length} checks`}
+      selectedItemId={initialSelection}
     >
       {entry.checks.length === 0 ? (
         <List.EmptyView
@@ -150,13 +158,7 @@ export function ChecksList(props: { initialEntry: QueueEntry }) {
         />
       ) : null}
       {entry.checks.map((check) => (
-        <CheckItem
-          key={`${check.workflow ?? ""}/${check.name}/${check.jobId ?? ""}`}
-          check={check}
-          entry={entry}
-          repo={repo}
-          view={view}
-        />
+        <CheckItem key={checkKey(check)} id={checkKey(check)} check={check} entry={entry} repo={repo} view={view} />
       ))}
     </List>
   );

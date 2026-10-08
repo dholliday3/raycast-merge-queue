@@ -1,21 +1,18 @@
 import { Cache, getPreferenceValues, LocalStorage } from "@raycast/api";
 import { useCachedPromise, useLocalStorage } from "@raycast/utils";
-import {
-  demoAnnotations,
-  DEMO_CHOICES,
-  DEMO_REPO,
-  DEMO_REQUIRED_CHECKS,
-  demoJob,
-  demoLog,
-  demoQueue,
-} from "./lib/demo";
+import { demoAnnotations, demoChoices, DEMO_REPO, DEMO_REQUIRED_CHECKS, demoJob, demoLog, demoQueue } from "./lib/demo";
 import { findGh, GhError, RepoConfig, repoSlug } from "./lib/gh";
 import { Annotation, fetchAnnotations, fetchJob, fetchJobLog, rerunFailedJobs, rerunJob } from "./lib/jobs";
 import { StepRef, summarizeLog } from "./lib/logs";
 import { fetchQueue, fetchRequiredChecks, parseQueue, QueueSnapshot } from "./lib/queue";
 import { fetchRepoChoices, rememberRecent, RepoChoice, RepoSelection, RepoSort, searchRepoChoices } from "./lib/repos";
 
-export type MergeQueueLaunchContext = { prNumber?: number; view?: "checks" | "repositories"; demo?: boolean };
+export type MergeQueueLaunchContext = {
+  prNumber?: number;
+  check?: string;
+  view?: "checks" | "job" | "repositories";
+  demo?: boolean;
+};
 
 type CachedRequiredChecks = { fetchedAt: number; checks: string[] };
 
@@ -111,12 +108,12 @@ export function useMergeQueue(selection: RepoSelection | undefined) {
 }
 
 async function loadChoices(useDemo: boolean): Promise<RepoChoice[]> {
-  return useDemo ? DEMO_CHOICES : fetchRepoChoices(ghConfig());
+  return useDemo ? demoChoices() : fetchRepoChoices(ghConfig());
 }
 
 async function loadSearch(useDemo: boolean, text: string, sort: RepoSort): Promise<RepoChoice[]> {
   if (useDemo) {
-    return DEMO_CHOICES.filter((choice) => choice.slug.includes(text.trim().toLowerCase()));
+    return demoChoices().filter((choice) => choice.slug.includes(text.trim().toLowerCase()));
   }
   return searchRepoChoices(ghConfig(), text, sort);
 }

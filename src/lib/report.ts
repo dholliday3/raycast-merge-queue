@@ -63,7 +63,8 @@ export function failureErrors(input: Pick<JobReportInput, "annotations" | "log" 
       hasFile && input.repo && input.sha
         ? `https://github.com/${input.repo}/blob/${input.sha}/${annotation.path}${annotation.line ? `#L${annotation.line}` : ""}`
         : undefined;
-    add({ text: `${annotation.title ? `${annotation.title}: ` : ""}${annotation.message}`, location, url });
+    const title = annotation.title && !location ? `${annotation.title}: ` : "";
+    add({ text: `${title}${annotation.message}`, location, url });
   }
   for (const error of loadedSummary(input.log)?.errors ?? []) {
     add({ text: error });
@@ -115,7 +116,7 @@ function errorLine(error: FailureError): string {
 
 function testsLines(summary: LogSummary, compact: boolean): string[] {
   const lines: string[] = [];
-  const label = (title: string, count: number) => (compact ? `**${title}**` : `## ${title} (${count})`);
+  const label = (title: string, count: number) => (compact ? `**${title}**` : `### ${title} (${count})`);
   if (summary.failedTests.length > 0) {
     lines.push(
       label("Failed Tests", summary.failedTests.length),
@@ -153,18 +154,20 @@ function logPlaceholder(log: LogState): string | undefined {
   }
 }
 
-function runningSteps(job: Job): string[] {
-  return job.steps.map((step) => {
-    if (step.status === "in_progress") {
-      const time = duration(step.startedAt, new Date().toISOString());
-      return `- ◐ **${step.name}**${time ? ` · ${time}` : ""}`;
-    }
-    if (step.status !== "completed") {
-      return `- ○ ${step.name}`;
-    }
-    const time = duration(step.startedAt, step.completedAt);
-    return `- ✓ ${step.name}${time ? ` · ${time}` : ""}`;
-  });
+function runningSteps(job: Job): string {
+  return job.steps
+    .map((step) => {
+      if (step.status === "in_progress") {
+        const time = duration(step.startedAt, new Date().toISOString());
+        return `◐ **${step.name}**${time ? ` · ${time}` : ""}`;
+      }
+      if (step.status !== "completed") {
+        return `○ ${step.name}`;
+      }
+      const time = duration(step.startedAt, step.completedAt);
+      return `✓ ${step.name}${time ? ` · ${time}` : ""}`;
+    })
+    .join("  \n");
 }
 
 export function buildPreviewMarkdown(input: JobReportInput): string {
@@ -173,7 +176,7 @@ export function buildPreviewMarkdown(input: JobReportInput): string {
     const time = duration(job.startedAt, new Date().toISOString());
     const step = currentStep(job);
     const position = step ? ` · step ${step.number} of ${job.steps.length}` : "";
-    return [`Running${time ? ` · ${time}` : ""}${position}`, "", ...runningSteps(job)].join("\n");
+    return [`Running${time ? ` · ${time}` : ""}${position}`, "", runningSteps(job)].join("\n");
   }
   if (check.state !== "failure") {
     const time =
@@ -215,7 +218,7 @@ function stepsLines(job: Job): string[] {
   if (job.steps.length === 0) {
     return [];
   }
-  const lines = ["## Steps", ""];
+  const lines = ["### Steps", ""];
   for (const step of notable) {
     const time = duration(step.startedAt, step.completedAt);
     const state = step.status !== "completed" ? "running" : (step.conclusion ?? "").replace(/_/g, " ");
@@ -228,18 +231,18 @@ function stepsLines(job: Job): string[] {
 }
 
 export function buildJobMarkdown(input: JobReportInput): string {
-  const { check, job, log } = input;
+  const { job, log } = input;
   const summary = loadedSummary(log);
-  const lines = [`# ${check.name}`, ""];
+  const lines: string[] = [];
   const errors = failureErrors(input);
   if (errors.length > 0) {
-    lines.push("## Errors", "", ...errors.map(errorLine), "");
+    lines.push("### Errors", "", ...errors.map(errorLine), "");
   }
   if (summary) {
     lines.push(...testsLines(summary, false));
   }
   const stepName = failingStepName(job, summary);
-  lines.push(`## Log${stepName ? ` · ${inlineCode(stepName)}` : ""}`, "");
+  lines.push(`### Log${stepName ? ` · ${inlineCode(stepName)}` : ""}`, "");
   const placeholder = logPlaceholder(log);
   lines.push(placeholder ?? fence(summary?.excerpt ?? []), "");
   if (job) {

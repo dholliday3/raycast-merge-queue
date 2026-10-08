@@ -24,9 +24,20 @@ export function secondsBetween(start?: string | null, end?: string | Date | null
   return Math.max(0, (endTime - startTime) / 1000);
 }
 
-export function formatAgo(iso: string): string {
-  const seconds = secondsBetween(iso, new Date());
-  return seconds === undefined ? "" : `${formatSeconds(seconds)} ago`;
+export function formatAgo(iso: string, now = new Date()): string {
+  const seconds = secondsBetween(iso, now);
+  if (seconds === undefined) {
+    return "";
+  }
+  if (seconds < 60) {
+    return "just now";
+  }
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
 }
 
 export function truncate(text: string, max: number): string {

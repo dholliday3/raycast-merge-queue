@@ -2,6 +2,8 @@
 
 See a GitHub merge queue from Raycast: where your pull request sits, what's running, and what's failing, with drill-down into each job's steps and log.
 
+![Merge Queue](metadata/merge-queue-1.png)
+
 ## Commands
 
 **Merge Queue** asks for a repository the first time, then lists every entry in the queue, in order, with its state:
@@ -15,6 +17,8 @@ See a GitHub merge queue from Raycast: where your pull request sits, what's runn
 Optional checks that fail are shown in orange and don't count against the entry. Filter to **Mine** or **Needs Attention** from the dropdown.
 
 `↵` on an entry opens its checks in two columns, built for debugging. The left column lists every check, failed first, then running, then finished. The right column previews the selected failure: errors with links to the file and line at the queued commit, failed and flaky tests, and the part of the log around the error. Below that, **Failure** links to the exact log line on GitHub (`⌘↵` opens it), with the run, duration and pull request. `↵` opens the full report, and `⇧⌘C` copies a summary with the link to paste into chat.
+
+![Checks](metadata/merge-queue-2.png)
 
 **Merge Queue Menu Bar** shows your position (`#3 · 14m`) with an icon for your worst entry's state, refreshing every minute. Each entry has a submenu with its failing checks and a rerun action.
 
