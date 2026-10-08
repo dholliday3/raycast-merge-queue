@@ -90,7 +90,14 @@ function EntryItem(props: {
                 title={`Show ${failingJob.name} Failure`}
                 icon={Icon.XMarkCircle}
                 shortcut={{ modifiers: ["cmd", "shift"], key: "f" }}
-                target={<JobDetail check={{ ...failingJob, jobId: failingJob.jobId }} pr={entry.pr} />}
+                target={
+                  <JobDetail
+                    check={{ ...failingJob, jobId: failingJob.jobId }}
+                    pr={entry.pr}
+                    repo={snapshot.repo}
+                    sha={entry.headSha}
+                  />
+                }
               />
             ) : null}
           </ActionPanel.Section>

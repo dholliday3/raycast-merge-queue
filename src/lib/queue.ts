@@ -35,6 +35,7 @@ export type QueueEntry = {
   enqueuedAt: string;
   enqueuer?: string;
   pr: PullRequestSummary;
+  headSha?: string;
   isMine: boolean;
   checks: Check[];
   health: Health;
@@ -88,6 +89,7 @@ export type RawEntry = {
     author: { login: string; avatarUrl: string } | null;
   } | null;
   headCommit: {
+    oid?: string;
     statusCheckRollup: { contexts: { nodes: (RawCheckRun | RawStatusContext | null)[] } } | null;
   } | null;
 };
@@ -126,6 +128,7 @@ query($owner: String!, $name: String!, $branch: String) {
           enqueuer { login }
           pullRequest { number title url headRefName author { login avatarUrl } }
           headCommit {
+            oid
             statusCheckRollup {
               contexts(first: 100) {
                 nodes {
@@ -276,6 +279,7 @@ function toEntry(raw: RawEntry, viewer: string, required: Set<string>): QueueEnt
       avatarUrl: pr.author?.avatarUrl,
       branch: pr.headRefName,
     },
+    headSha: raw.headCommit?.oid,
     isMine: author === viewer || raw.enqueuer?.login === viewer,
     checks,
     health: healthOf(raw.state, checks, failingRequired),

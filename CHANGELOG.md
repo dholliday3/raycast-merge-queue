@@ -3,8 +3,9 @@
 ## [Initial Version] - {PR_MERGE_DATE}
 
 - Merge Queue: every entry in order with its state, required-check progress, ETA, and failing checks; filter to yours or the ones that need attention
-- Checks view per entry, grouped into failing (required, then optional), running, passed and skipped
-- Job view with steps, key errors, failed and flaky tests, and a log excerpt from where it failed; copy a failure summary to paste into chat
+- Checks in two columns: only what's failing on the left, a preview of the selected failure on the right with errors linked to the file and line, failed and flaky tests, and the log around the error
+- Links straight to the failing line of the log on GitHub
+- Full report per job with the failed step, errors, tests and log; copy a failure summary with links to paste into chat
 - Rerun failed jobs or a single job, with a confirmation first
 - Merge Queue Menu Bar: your position and state, refreshed every minute
 - Remembers your repository and opens straight to its queue; picks it for you the first time when there's only one likely queue

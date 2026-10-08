@@ -83,7 +83,10 @@ function entry(
       headRefName: `${fields.author}/${fields.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
       author: { login: fields.author, avatarUrl: "" },
     },
-    headCommit: { statusCheckRollup: { contexts: { nodes: fields.checks } } },
+    headCommit: {
+      oid: `4f1c2a9d8e7b6c5a4f3e2d1c0b9a8f7e6d5c${fields.number}`,
+      statusCheckRollup: { contexts: { nodes: fields.checks } },
+    },
   };
 }
 

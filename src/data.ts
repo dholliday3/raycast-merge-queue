@@ -11,7 +11,7 @@ import {
 } from "./lib/demo";
 import { findGh, GhError, RepoConfig, repoSlug } from "./lib/gh";
 import { Annotation, fetchAnnotations, fetchJob, fetchJobLog, rerunFailedJobs, rerunJob } from "./lib/jobs";
-import { summarizeLog } from "./lib/logs";
+import { StepRef, summarizeLog } from "./lib/logs";
 import { fetchQueue, fetchRequiredChecks, parseQueue, QueueSnapshot } from "./lib/queue";
 import { fetchRepoChoices, rememberRecent, RepoChoice, RepoSelection, RepoSort, searchRepoChoices } from "./lib/repos";
 
@@ -144,8 +144,8 @@ export async function loadJob(jobId: number) {
   return { job, annotations };
 }
 
-export async function loadLogSummary(jobId: number) {
-  return summarizeLog(demo ? DEMO_LOG : await fetchJobLog(await getConfig(), jobId));
+export async function loadLogSummary(jobId: number, step?: StepRef) {
+  return summarizeLog(demo ? DEMO_LOG : await fetchJobLog(await getConfig(), jobId), step);
 }
 
 export async function requestRerunFailed(runIds: number[]) {

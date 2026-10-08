@@ -12,7 +12,9 @@ See a GitHub merge queue from Raycast: where your pull request sits, what's runn
 - **Merge conflict**: GitHub couldn't build a merge group, so no checks ran
 - **Waiting to build** / **Ready to merge**
 
-Optional checks that fail are shown in orange and don't count against the entry. Filter to **Mine** or **Needs Attention** from the dropdown. `↵` opens an entry's checks, grouped into failing (required, then optional), running, passed and skipped. `↵` on a check opens its job: the steps, the failing step in bold, key errors from annotations and the log, failed and flaky tests (Playwright and Vitest), and a log excerpt from where it failed.
+Optional checks that fail are shown in orange and don't count against the entry. Filter to **Mine** or **Needs Attention** from the dropdown.
+
+`↵` on an entry opens its checks in two columns, built for debugging. The left column shows only what's failing (or running, when nothing is), with everything else folded into one row; `⇧⌘A` shows every check. The right column previews the selected failure: errors with links to the file and line at the queued commit, failed and flaky tests, and the part of the log around the error. Below that, **Failure** links to the exact log line on GitHub (`⌘↵` opens it), with the run, duration and pull request. `↵` opens the full report, and `⇧⌘C` copies a summary with the link to paste into chat.
 
 **Merge Queue Menu Bar** shows your position (`#3 · 14m`) with an icon for your worst entry's state, refreshing every minute. Each entry has a submenu with its failing checks and a rerun action.
 
@@ -36,19 +38,21 @@ The extension reads through `gh`, so it sees exactly what your `gh` account can 
 
 ## Shortcuts
 
-| Key   | Action                                                               |
-| ----- | -------------------------------------------------------------------- |
-| `↵`   | Show checks / show a job's steps and log                             |
-| `⇧⌘F` | Show the entry's failing job                                         |
-| `⇧⌘R` | Rerun failed jobs (asks first)                                       |
-| `⇧⌘J` | Rerun this job (asks first)                                          |
-| `⇧⌘C` | Copy the PR URL, check name, or a failure summary to paste into chat |
-| `⇧⌘E` | Copy the log excerpt                                                 |
-| `⇧⌘B` | Copy the branch name                                                 |
-| `⇧⌘G` | Open the merge queue on GitHub                                       |
-| `⌘L`  | Load the log of a job that didn't fail                               |
-| `⌘R`  | Refresh                                                              |
-| `⇧⌘P` | Switch repository                                                    |
+| Key   | Action                                                              |
+| ----- | ------------------------------------------------------------------- |
+| `↵`   | Show checks / show the full report for a check                      |
+| `⌘↵`  | Open the failure on GitHub, at the failing log line                 |
+| `⇧⌘A` | Show all checks / failures only                                     |
+| `⇧⌘F` | Show the entry's failing job                                        |
+| `⇧⌘R` | Rerun failed jobs (asks first)                                      |
+| `⇧⌘J` | Rerun this job (asks first)                                         |
+| `⇧⌘C` | Copy the PR URL, or a failure summary with links to paste into chat |
+| `⇧⌘E` | Copy the log excerpt                                                |
+| `⇧⌘B` | Copy the branch name                                                |
+| `⇧⌘G` | Open the merge queue on GitHub                                      |
+| `⌘L`  | Load the log of a job that didn't fail                              |
+| `⌘R`  | Refresh                                                             |
+| `⇧⌘P` | Switch repository                                                   |
 
 ## Development
 
