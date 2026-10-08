@@ -19,7 +19,12 @@ export const DEMO_CHOICES: RepoChoice[] = [
 ];
 export const DEMO_REQUIRED_CHECKS = ["build", "lint", "typecheck", "unit tests", "e2e (chromium)", "migrations"];
 export const DEMO_FAILING_JOB_ID = 9100;
-const DEMO_FAILURE_IDS: Record<string, number> = { "e2e (chromium)": 9100, lighthouse: 9101, "bundle size": 9102 };
+const DEMO_FAILURE_IDS: Record<string, number> = {
+  "e2e (chromium)": 9100,
+  lighthouse: 9101,
+  "bundle size": 9102,
+  "security audit": 9103,
+};
 
 type RunState = "success" | "failure" | "running" | "queued" | "skipped";
 
@@ -119,7 +124,7 @@ export function demoQueue(now = new Date()): QueueResponse {
               author: "mira",
               state: "LOCKED",
               enqueuedMinutesAgo: 41,
-              checks: suite(now, { lighthouse: "running" }, 30),
+              checks: suite(now, { lighthouse: "running", "security audit": "failure" }, 30),
             }),
             entry(now, {
               position: 2,
@@ -225,6 +230,16 @@ const DEMO_JOBS: Record<number, { name: string; workflow: string; steps: DemoSte
       ["Build", "success", 8, 5],
       ["Check bundle size", "failure", 5, 4],
       ["Complete job", "success", 4, 4],
+    ],
+  },
+  9103: {
+    name: "security audit",
+    workflow: "Quality",
+    steps: [
+      ["Set up job", "success", 28, 28],
+      ["Check out code", "success", 28, 27],
+      ["Audit dependencies", "failure", 27, 26],
+      ["Complete job", "success", 26, 26],
     ],
   },
 };
@@ -362,6 +377,23 @@ const DEMO_OTHER_LOGS: Record<number, string[]> = {
     "  Size:       312.4 kB with all dependencies, minified and gzipped",
     "",
     "##[error]dist/main.js is 12.4 kB over its 300 kB limit",
+    "##[error]Process completed with exit code 1.",
+  ],
+  9103: [
+    "##[group]Run npm audit --audit-level=high",
+    "npm audit --audit-level=high",
+    "##[endgroup]",
+    "# npm audit report",
+    "",
+    "image-size  <1.2.1",
+    "Severity: high",
+    "Denial of service via a crafted image - https://github.com/advisories/GHSA-m5qc-5hw7-8vg7",
+    "fix available via `npm audit fix`",
+    "node_modules/image-size",
+    "",
+    "1 high severity vulnerability",
+    "",
+    "##[error]npm audit found 1 high severity vulnerability (image-size <1.2.1)",
     "##[error]Process completed with exit code 1.",
   ],
 };

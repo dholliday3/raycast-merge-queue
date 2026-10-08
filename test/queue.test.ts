@@ -90,6 +90,18 @@ describe("parseQueue", () => {
   });
 });
 
+describe("demo's first entry", () => {
+  it("is merging with an optional check failing and another running", () => {
+    const entry = byNumber(4812);
+    expect(entry.health).toBe("merging");
+    expect(entry.failingOptional.map((check) => check.name)).toEqual(["security audit"]);
+    expect(entry.checks.slice(0, 2).map((check) => [check.name, check.state])).toEqual([
+      ["security audit", "failure"],
+      ["lighthouse", "pending"],
+    ]);
+  });
+});
+
 describe("failing jobs", () => {
   it("collects each failing workflow run once", () => {
     expect(failingRunIds(byNumber(4815))).toHaveLength(2);
